@@ -1,0 +1,319 @@
+﻿@page "/"
+@inject StorageService Storage
+@inject IJSRuntime JS
+
+<div class="sk-container">
+
+    <!-- Header Principal -->
+    <header class="sk-header">
+        <div class="sk-logo-box">
+            <img src="icon.svg" width="40" height="40" class="sk-logo-img" alt="SUPER-K" />
+            <div>
+                <h1 class="sk-title">SUPER-K</h1>
+                <p class="sk-subtitle">Control de Súper & Despensa</p>
+            </div>
+        </div>
+        
+        <div class="sk-badge-total">
+            <span class="sk-badge-label">Estimado</span>
+            <span class="sk-badge-amount">$@TotalEstimado.ToString("F2")</span>
+        </div>
+    </header>
+
+    <!-- Botones Rápidos -->
+    <div class="sk-grid-buttons">
+        <button @onclick="AbrirModalNuevoProducto" class="sk-btn-primary">
+            <span>➕</span> Agregar
+        </button>
+        <button @onclick="AbrirEscanerCamara" class="sk-btn-secondary">
+            <span>📷</span> Escanear
+        </button>
+    </div>
+
+    <!-- Tarjeta de Lista -->
+    <div class="sk-card">
+        <div class="sk-card-header">
+            <span class="sk-card-title">🛒 Lista del Súper (@ListaActual.Count)</span>
+            @if (ListaActual.Any())
+            {
+                <button @onclick="LimpiarLista" class="sk-btn-text-danger">Vaciar lista</button>
+            }
+        </div>
+
+        @if (!ListaActual.Any())
+        {
+            <div class="sk-empty-state">
+                <p style="font-size: 2.5rem; margin-bottom: 8px;">🛍️</p>
+                <p style="font-weight: 600; color: #f8fafc; font-size: 0.9rem;">Tu lista está vacía</p>
+                <p style="font-size: 0.75rem; margin-top: 4px;">Escanea un código de barras o agrega un producto.</p>
+            </div>
+        }
+        else
+        {
+            <div>
+                @foreach (var item in ListaActual)
+                {
+                    var prod = Productos.FirstOrDefault(p => p.Id == item.ProductoId);
+                    <div class="sk-item">
+                        <div class="sk-item-left">
+                            <input type="checkbox" checked="@item.EnCarrito" @onchange="() => ToggleCarrito(item)" class="sk-checkbox" />
+                            <div>
+                                <p class="sk-item-name @(item.EnCarrito ? "completed" : "")">
+                                    @(prod?.Nombre ?? "Producto")
+                                </p>
+                                <p class="sk-item-price">
+                                    $@item.PrecioEnCaja x @item.CantidadPlaneada @(prod?.UnidadMedida ?? "Pza")
+                                </p>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center;">
+                            <div class="sk-qty-box">
+                                <button @onclick="() => CambiarCantidad(item, -1)" class="sk-btn-qty">-</button>
+                                <span class="sk-qty-num">@item.CantidadPlaneada</span>
+                                <button @onclick="() => CambiarCantidad(item, 1)" class="sk-btn-qty">+</button>
+                            </div>
+                            <span class="sk-item-subtotal">$@item.Subtotal.ToString("F2")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+</div>
+
+<!-- Menú Inferior Nivel App Móvil -->
+<nav class="sk-bottom-nav">
+    <div class="sk-nav-container">
+        <button class="sk-nav-btn active">
+            <span style="font-size: 1.2rem;">🛒</span>
+            <span>Súper</span>
+        </button>
+        <button class="sk-nav-btn">
+            <span style="font-size: 1.2rem;">📦</span>
+            <span>Despensa</span>
+        </button>
+        <button class="sk-nav-btn">
+            <span style="font-size: 1.2rem;">🏷️</span>
+            <span>Precios</span>
+        </button>
+    </div>
+</nav>
+
+<!-- Modal Escáner de Cámara -->
+@if (MostrarCamara)
+{
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card" style="text-align: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="color:#10b981; font-size:1rem; font-weight:bold;">Escanear Código de Barras</h3>
+                <button @onclick="CerrarCamara" class="sk-btn-text-danger">✕ Cerrar</button>
+            </div>
+
+            <!-- Contenedor donde JS montará la cámara -->
+            <div id="reader" style="width: 100%; min-height: 250px; background: #000; border-radius: 12px; overflow: hidden;"></div>
+
+            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
+                Apunta con la cámara al código de barras del producto.
+            </p>
+        </div>
+    </div>
+}
+
+<!-- Modal Agregar Producto -->
+@if (MostrarModal)
+{
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card">
+            <h3 style="color:#10b981; font-size:1rem; margin-bottom:12px; font-weight:bold;">
+                @(string.IsNullOrEmpty(NuevoCodigo) ? "Agregar Producto" : "Nuevo Producto Detectado")
+            </h3>
+            
+            @if (!string.IsNullOrEmpty(NuevoCodigo))
+            {
+                <div style="background: rgba(16,185,129,0.1); border: 1px dashed #10b981; padding: 6px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.75rem; color: #10b981;">
+                    Código: <strong>@NuevoCodigo</strong>
+                </div>
+            }
+
+            <div class="sk-form-group">
+                <label class="sk-label">Nombre del producto</label>
+                <input type="text" @bind="NuevoNombre" class="sk-input" placeholder="Ej. Aceite de Cocina 1L" />
+            </div>
+
+            <div class="sk-form-group">
+                <label class="sk-label">Categoría</label>
+                <select @bind="CategoriaSeleccionadaId" class="sk-select">
+                    @foreach (var cat in Categorias)
+                    {
+                        <option value="@cat.Id">@cat.Icono @cat.Nombre</option>
+                    }
+                </select>
+            </div>
+
+            <div class="sk-grid-2 sk-form-group">
+                <div>
+                    <label class="sk-label">Precio ($)</label>
+                    <input type="number" step="0.5" @bind="NuevoPrecio" class="sk-input" />
+                </div>
+                <div>
+                    <label class="sk-label">Cantidad</label>
+                    <input type="number" @bind="NuevaCantidad" class="sk-input" />
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button @onclick="CerrarModal" class="sk-btn-secondary" style="padding:8px 16px;">Cancelar</button>
+                <button @onclick="GuardarNuevoProducto" class="sk-btn-primary" style="padding:8px 16px;">Guardar</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Categoria> Categorias = new();
+    private List<Producto> Productos = new();
+    private List<ItemLista> ListaActual = new();
+
+    private bool MostrarModal = false;
+    private bool MostrarCamara = false;
+
+    private string NuevoNombre = "";
+    private string NuevoCodigo = "";
+    private string CategoriaSeleccionadaId = "";
+    private decimal NuevoPrecio = 25.00m;
+    private int NuevaCantidad = 1;
+
+    private DotNetObjectReference<Home>? dotNetHelper;
+
+    private decimal TotalEstimado => ListaActual.Sum(i => i.Subtotal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Categorias = await Storage.ObtenerCategoriasAsync();
+        Productos = await Storage.ObtenerProductosAsync();
+        ListaActual = await Storage.ObtenerListaActualAsync();
+
+        if (Categorias.Any())
+            CategoriaSeleccionadaId = Categorias.First().Id;
+
+        dotNetHelper = DotNetObjectReference.Create(this);
+    }
+
+    private async Task AbrirEscanerCamara()
+    {
+        MostrarCamara = true;
+        StateHasChanged();
+        await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
+    }
+
+    private async Task CerrarCamara()
+    {
+        MostrarCamara = false;
+        await JS.InvokeVoidAsync("superKScanner.detenerEscaner");
+    }
+
+    [JSInvokable]
+    public async Task OnCodigoEscaneado(string codigo)
+    {
+        await CerrarCamara();
+
+        // Buscar si el producto ya existe en el catálogo por su código de barras
+        var productoExistente = Productos.FirstOrDefault(p => p.CodigoBarras == codigo);
+
+        if (productoExistente != null)
+        {
+            // Si existe, revisamos si ya está en la lista actual
+            var itemEnLista = ListaActual.FirstOrDefault(i => i.ProductoId == productoExistente.Id);
+            if (itemEnLista != null)
+            {
+                itemEnLista.CantidadPlaneada++;
+            }
+            else
+            {
+                ListaActual.Add(new ItemLista
+                {
+                    ProductoId = productoExistente.Id,
+                    CantidadPlaneada = 1,
+                    PrecioEnCaja = productoExistente.UltimoPrecio
+                });
+            }
+            await Storage.GuardarListaActualAsync(ListaActual);
+        }
+        else
+        {
+            // Si es un producto nuevo, abrimos el modal precargando el código
+            NuevoCodigo = codigo;
+            NuevoNombre = "";
+            AbrirModalNuevoProducto();
+        }
+
+        StateHasChanged();
+    }
+
+    private void AbrirModalNuevoProducto() => MostrarModal = true;
+    
+    private void CerrarModal()
+    {
+        MostrarModal = false;
+        NuevoCodigo = "";
+    }
+
+    private async Task GuardarNuevoProducto()
+    {
+        if (string.IsNullOrWhiteSpace(NuevoNombre)) return;
+
+        var producto = new Producto
+        {
+            Nombre = NuevoNombre,
+            CodigoBarras = NuevoCodigo,
+            CategoriaId = CategoriaSeleccionadaId,
+            UltimoPrecio = NuevoPrecio
+        };
+
+        await Storage.GuardarProductoAsync(producto);
+        Productos.Add(producto);
+
+        var item = new ItemLista
+        {
+            ProductoId = producto.Id,
+            CantidadPlaneada = NuevaCantidad,
+            PrecioEnCaja = NuevoPrecio
+        };
+
+        ListaActual.Add(item);
+        await Storage.GuardarListaActualAsync(ListaActual);
+
+        NuevoNombre = "";
+        NuevoCodigo = "";
+        CerrarModal();
+    }
+
+    private async Task ToggleCarrito(ItemLista item)
+    {
+        item.EnCarrito = !item.EnCarrito;
+        await Storage.GuardarListaActualAsync(ListaActual);
+    }
+
+    private async Task CambiarCantidad(ItemLista item, decimal cambio)
+    {
+        item.CantidadPlaneada += cambio;
+        if (item.CantidadPlaneada <= 0)
+        {
+            ListaActual.Remove(item);
+        }
+        await Storage.GuardarListaActualAsync(ListaActual);
+    }
+
+    private async Task LimpiarLista()
+    {
+        ListaActual.Clear();
+        await Storage.GuardarListaActualAsync(ListaActual);
+    }
+
+    public void Dispose()
+    {
+        dotNetHelper?.Dispose();
+    }
+}

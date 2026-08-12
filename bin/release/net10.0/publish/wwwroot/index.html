@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SUPER-K</title>
+    <base href="/" />
+    
+    <link rel="stylesheet" href="css/app.css" />
+    <link href="manifest.webmanifest" rel="type/webmanifest" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+</head>
+
+<body>
+    <div id="app">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#020617; color:#10b981;">
+            <img src="icon.svg" style="width:50px; height:50px; margin-bottom:12px;" alt="SUPER-K" />
+            <h2 style="font-family:sans-serif;">SUPER-K</h2>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" style="display:none;">
+        Ocurrió un error inesperado.
+    </div>
+
+    <!-- Librería para lectura de Código de Barras por Cámara -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="js/scanner.js"></script>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,13 @@
+1. NOMBRE DE LA APP 
+	Se necesita establecer el nombre de una vez de la pwa para que desde un inicio asi este dado de alta en la pagina y para el usuario al igual crear un icono con referencia a el 	super y la despensa. Tendras que hacer un estudio de mercado para ver nombres e iconos y que mejoras en relación a la competencia podemos ofrecer
+2. CAPACIDAD DE ESCANEO 
+	Al entrar a la app nos deberemos topar con una interfaz amigable y sencialla de uso para el usuario en donde el pueda agregar por categorías definidas o que el usuario vaya creando 	los productos que necesita y ver la capacidad sobre todo en dispositivos mobiles el usar la camara para poder escanear códigos de barras y determinar que producto es y a que categoría colocarlo para ir creando la lista del supermercado
+
+3. REVISION DE PRECIOS
+	Al tener capturado un producto o mejor dicho escaneado el producto si es viable hacer una revision en la web para establecer el precio del producto por ejemplo se escanea un aceite de cocina y se busca en la web estableciendo que su precio en x supermercado esta en $20.00 pesos y agregarlo a la lista del super y poder también establecer cuantos productos se van a acomprar
+4. CONTROL DE PRECIOS Y SU TOTAL
+	Cuando se tenga ya la lista completa se debe poder hacer la sumatoria antes de ir al super para saber el aproximado de lo que se va gastar en el mandado
+5. COMPRANDO
+	Ya estando en el super y teniendo la lista del super si es posible escanear por código de barras el producto para descontarlo de la lista y ponerlo en un tipo carrito de compras y poder editar el precio al que se tiene realmente en la tienda y conservarlo para una nueva lista, y a su vez crear un tipo inventario para el hogar para que cuando se vaya disponiendo de algún producto se marque en la aplicación y se descuente con la finalidad que cuando ya no haya disponibles este en automatico se vaya a una nueva lista del super para la próxima compra con el precio que se guardo en la ultima compra, en el carrito de compras deberá ir haciendo la suma para que al final se pueda verificar al momento de pagar sea lo mismo que se sumo durante la compra y también poder tomar fotos si es que hay promociones o descuentos para que sean aplicados al momento de estar pagando en cajas tenerlo como evidencia de la promoción o descuento 
+
+	 
