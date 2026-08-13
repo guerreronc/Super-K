@@ -17,4 +17,11 @@
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>
 
+  <!-- Copia exacta de CERO-K para que Vercel encuentre la configuración -->
+  <ItemGroup>
+    <None Include="vercel.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
