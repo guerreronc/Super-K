@@ -1122,16 +1122,18 @@ C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\refint\A
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\App SUPER-K.pdb
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\ref\App SUPER-K.dll
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\bxhok9kgdg-{0}-1gqnmpvctd-1gqnmpvctd.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.ari4wl26ne.wasm
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.iyw66wolq3.pdb
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\dotnet.zusuu4e59v.js
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.ari4wl26ne.wasm.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.iyw66wolq3.pdb.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\dotnet.zusuu4e59v.js.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\p1troux5tl-{0}-m28foixrra-m28foixrra.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\r9g374t1kx-{0}-urjb84cxc1-urjb84cxc1.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ads1mk1xne-{0}-ari4wl26ne-ari4wl26ne.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\na1oyl6cao-{0}-iyw66wolq3-iyw66wolq3.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\om6zv3h7d6-{0}-zusuu4e59v-zusuu4e59v.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ry1svf49de-{0}-bz6nwwr3mn-bz6nwwr3mn.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ht8165rftd-{0}-6zbs0f7pgz-6zbs0f7pgz.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.pejm58598w.wasm
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.hy26aidz9r.pdb
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\dotnet.pjte77k9a0.js
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.pejm58598w.wasm.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.hy26aidz9r.pdb.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\dotnet.pjte77k9a0.js.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\vercel.json
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\App SUPER-K.sourcelink.json
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\r9g374t1kx-{0}-729x31mexf-729x31mexf.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ads1mk1xne-{0}-pejm58598w-pejm58598w.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\na1oyl6cao-{0}-hy26aidz9r-hy26aidz9r.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\om6zv3h7d6-{0}-pjte77k9a0-pjte77k9a0.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ry1svf49de-{0}-teom8t7umi-teom8t7umi.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ht8165rftd-{0}-4jyxd31oxm-4jyxd31oxm.gz
