@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("App SUPER-K")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b7476c59da8129c39012e012ae2da303a6cf4de4")]
 [assembly: System.Reflection.AssemblyProductAttribute("App SUPER-K")]
 [assembly: System.Reflection.AssemblyTitleAttribute("App SUPER-K")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
