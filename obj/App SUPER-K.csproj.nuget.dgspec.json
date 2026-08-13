@@ -54,12 +54,12 @@
             },
             "Microsoft.AspNetCore.Components.WebAssembly": {
               "target": "Package",
-              "version": "[10.0.11, )"
+              "version": "[10.0.*, )"
             },
             "Microsoft.AspNetCore.Components.WebAssembly.DevServer": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[10.0.11, )"
+              "version": "[10.0.*, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
