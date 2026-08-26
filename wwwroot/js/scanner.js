@@ -25,6 +25,26 @@ window.superKScanner = {
         verbose: false
       });
 
+      // 1. Obtener lista de cámaras físicas detectadas en el dispositivo
+      const devices = await Html5Qrcode.getCameras();
+      if (!devices || devices.length === 0) {
+        console.error("No se encontraron cámaras disponibles.");
+        return;
+      }
+
+      // 2. Filtrar por nombre ("back", "rear", "trasera") o tomar la última de la lista (casi siempre trasera en iOS)
+      let cameraId = devices[0].id;
+      const backCamera = devices.find(device => 
+        /back|rear|trasera|environment/i.test(device.label)
+      );
+
+      if (backCamera) {
+        cameraId = backCamera.id;
+      } else if (devices.length > 1) {
+        // En iPhones, la cámara trasera suele ser la última del arreglo
+        cameraId = devices[devices.length - 1].id;
+      }
+
       const config = {
         fps: 30,
         experimentalFeatures: {
@@ -36,9 +56,9 @@ window.superKScanner = {
         }
       };
 
-      // Forzar la cámara trasera especificando 'environment' directamente
+      // 3. Iniciar pasando el ID físico exacto
       await this.html5QrCode.start(
-        { facingMode: "environment" },
+        cameraId,
         config,
         (decodedText) => {
           if (dotNetHelper) {
@@ -48,7 +68,7 @@ window.superKScanner = {
         (errorMessage) => {}
       );
     } catch (err) {
-      console.error("Error al iniciar cámara trasera:", err);
+      console.error("Error al iniciar cámara:", err);
     }
   },
 
