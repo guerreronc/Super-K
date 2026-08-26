@@ -4,11 +4,10 @@ window.superKScanner = {
     iniciarEscaner: function (dotNetHelper) {
         this.detenerEscaner();
 
-        setTimeout(() => {
+        setTimeout(async () => {
             const element = document.getElementById("reader");
             if (!element) return;
 
-            // 1. Formatos 1D de supermercado activados
             const formatsToSupport = [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -17,7 +16,6 @@ window.superKScanner = {
                 Html5QrcodeSupportedFormats.CODE_128
             ];
 
-            // 2. Configuración optimizada de fotogramas, motor nativo y resolución HD
             const config = {
                 fps: 30,
                 experimentalFeatures: {
@@ -34,32 +32,40 @@ window.superKScanner = {
                 verbose: false
             });
 
-            // 3. Selección de cámara física trasera
-            Html5Qrcode.getCameras().then(devices => {
-                if (devices && devices.length > 0) {
-                    // Buscar cámara trasera por nombre ('back', 'rear', 'trasera')
-                    let backCamera = devices.find(device => 
-                        /back|rear|trasera|environment/i.test(device.label)
-                    );
-
-                    // Si no la halla por etiqueta, selecciona la última del arreglo (cámara trasera en móviles)
-                    let cameraId = backCamera ? backCamera.id : (devices.length > 1 ? devices[devices.length - 1].id : devices[0].id);
-
-                    this.html5QrcodeScanner.start(
-                        cameraId,
-                        config,
-                        (decodedText) => {
-                            this.reproducirBeep();
-                            if (dotNetHelper) {
-                                dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
-                            }
-                        },
-                        (errorMessage) => {
-                            // Ignorar fotogramas sin código
+            const ejecutarCamara = (camConfig) => {
+                return this.html5QrcodeScanner.start(
+                    camConfig,
+                    config,
+                    (decodedText) => {
+                        this.reproducirBeep();
+                        if (dotNetHelper) {
+                            dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
                         }
-                    ).catch(err => console.error("Error al iniciar cámara:", err));
+                    },
+                    (errorMessage) => {}
+                );
+            };
+
+            // Intento 1: Obligar a iOS Safari a usar la cámara trasera exacta
+            try {
+                await ejecutarCamara({ facingMode: { exact: "environment" } });
+            } catch (err1) {
+                // Intento 2: Si falla exact (ej. en laptops sin cámara trasera), intenta trasera preferente
+                try {
+                    await ejecutarCamara({ facingMode: "environment" });
+                } catch (err2) {
+                    // Intento 3: Seleccionar el último dispositivo detectado
+                    try {
+                        const devices = await Html5Qrcode.getCameras();
+                        if (devices && devices.length > 0) {
+                            const cameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
+                            await ejecutarCamara(cameraId);
+                        }
+                    } catch (err3) {
+                        console.error("No se pudo acceder a ninguna cámara:", err3);
+                    }
                 }
-            }).catch(err => console.error("Error al listar cámaras:", err));
+            }
 
         }, 300);
     },
