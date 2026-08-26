@@ -8,7 +8,6 @@ window.superKScanner = {
             const element = document.getElementById("reader");
             if (!element) return;
 
-            // Formatos de supermercado (1D)
             const formatsToSupport = [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -17,9 +16,15 @@ window.superKScanner = {
                 Html5QrcodeSupportedFormats.CODE_128
             ];
 
-            // Configuración limpia sin videoConstraints que rompan la selección de cámara en Safari
             const config = {
                 fps: 30,
+                // Recuadro horizontal en el centro para concentrar el procesamiento en las barras
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    return {
+                        width: Math.floor(viewfinderWidth * 0.85),
+                        height: Math.floor(viewfinderHeight * 0.35)
+                    };
+                },
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
                 }
@@ -30,7 +35,6 @@ window.superKScanner = {
                 verbose: false
             });
 
-            // Método 1: Intentar solicitar la cámara trasera directa en iOS/Android
             this.html5QrcodeScanner.start(
                 { facingMode: "environment" },
                 config,
@@ -42,8 +46,6 @@ window.superKScanner = {
                 },
                 (errorMessage) => {}
             ).catch(err => {
-                console.warn("Fallo facingMode directo, intentando por lista de hardware:", err);
-                // Método 2: Fallback por ID de hardware (el que nos funcionaba antes)
                 Html5Qrcode.getCameras().then(devices => {
                     if (devices && devices.length > 0) {
                         const cameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
