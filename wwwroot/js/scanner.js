@@ -4,10 +4,11 @@ window.superKScanner = {
     iniciarEscaner: function (dotNetHelper) {
         this.detenerEscaner();
 
-        setTimeout(async () => {
+        setTimeout(() => {
             const element = document.getElementById("reader");
             if (!element) return;
 
+            // Formatos de supermercado (1D)
             const formatsToSupport = [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -16,14 +17,11 @@ window.superKScanner = {
                 Html5QrcodeSupportedFormats.CODE_128
             ];
 
+            // Configuración limpia sin videoConstraints que rompan la selección de cámara en Safari
             const config = {
                 fps: 30,
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
-                },
-                videoConstraints: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
                 }
             };
 
@@ -32,40 +30,37 @@ window.superKScanner = {
                 verbose: false
             });
 
-            const ejecutarCamara = (camConfig) => {
-                return this.html5QrcodeScanner.start(
-                    camConfig,
-                    config,
-                    (decodedText) => {
-                        this.reproducirBeep();
-                        if (dotNetHelper) {
-                            dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
-                        }
-                    },
-                    (errorMessage) => {}
-                );
-            };
-
-            // Intento 1: Obligar a iOS Safari a usar la cámara trasera exacta
-            try {
-                await ejecutarCamara({ facingMode: { exact: "environment" } });
-            } catch (err1) {
-                // Intento 2: Si falla exact (ej. en laptops sin cámara trasera), intenta trasera preferente
-                try {
-                    await ejecutarCamara({ facingMode: "environment" });
-                } catch (err2) {
-                    // Intento 3: Seleccionar el último dispositivo detectado
-                    try {
-                        const devices = await Html5Qrcode.getCameras();
-                        if (devices && devices.length > 0) {
-                            const cameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
-                            await ejecutarCamara(cameraId);
-                        }
-                    } catch (err3) {
-                        console.error("No se pudo acceder a ninguna cámara:", err3);
+            // Método 1: Intentar solicitar la cámara trasera directa en iOS/Android
+            this.html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText) => {
+                    this.reproducirBeep();
+                    if (dotNetHelper) {
+                        dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
                     }
-                }
-            }
+                },
+                (errorMessage) => {}
+            ).catch(err => {
+                console.warn("Fallo facingMode directo, intentando por lista de hardware:", err);
+                // Método 2: Fallback por ID de hardware (el que nos funcionaba antes)
+                Html5Qrcode.getCameras().then(devices => {
+                    if (devices && devices.length > 0) {
+                        const cameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
+                        this.html5QrcodeScanner.start(
+                            cameraId,
+                            config,
+                            (decodedText) => {
+                                this.reproducirBeep();
+                                if (dotNetHelper) {
+                                    dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
+                                }
+                            },
+                            (errorMessage) => {}
+                        );
+                    }
+                });
+            });
 
         }, 300);
     },
