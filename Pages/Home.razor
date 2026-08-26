@@ -1,7 +1,6 @@
 ﻿@page "/"
 @inject StorageService Storage
 @inject IJSRuntime JS
-
 <div class="sk-container">
 
     <!-- Header Principal -->
@@ -112,7 +111,7 @@
             </div>
 
             <!-- Contenedor donde JS montará la cámara -->
-            <div id="reader" style="width: 100%; min-height: 250px; background: #000; border-radius: 12px; overflow: hidden;"></div>
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
 
             <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
                 Apunta con la cámara al código de barras del producto.
@@ -204,7 +203,14 @@
     private async Task AbrirEscanerCamara()
     {
         MostrarCamara = true;
-        StateHasChanged();
+        StateHasChanged(); 
+
+        // Pausa breve para asegurar que Blazor pinte el <div id="reader"> en el HTML
+        await Task.Delay(100); 
+
+        // Asegurar que dotNetHelper esté creado
+        dotNetHelper ??= DotNetObjectReference.Create(this);
+
         await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
     }
 

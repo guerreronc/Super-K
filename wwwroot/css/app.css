@@ -334,3 +334,9 @@ body {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
 }
+#reader video {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: cover;
+    border-radius: 8px;
+}
