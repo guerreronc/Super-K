@@ -340,3 +340,23 @@ body {
     object-fit: cover;
     border-radius: 8px;
 }
+#reader {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+#reader video, #reader canvas.drawingBuffer {
+    width: 100% !important;
+    height: auto !important;
+    display: block;
+}
+
+#reader canvas.drawingBuffer {
+    position: absolute;
+    top: 0;
+    left: 0;
+}

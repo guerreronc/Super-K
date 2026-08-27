@@ -5,69 +5,78 @@ namespace SuperK.Services;
 public class StorageService
 {
     private readonly LocalStorageService _localStorage;
-    private const string KEY_PRODUCTOS = "superk_productos";
     private const string KEY_CATEGORIAS = "superk_categorias";
-    private const string KEY_CARRITO = "superk_carrito";
-    private const string KEY_DESPENSA = "superk_despensa";
+    private const string KEY_PRODUCTOS = "superk_productos";
+    private const string KEY_LISTA = "superk_lista_actual";
 
     public StorageService(LocalStorageService localStorage)
     {
         _localStorage = localStorage;
     }
 
-    // --- CATEGORÍAS ---
     public async Task<List<Categoria>> ObtenerCategoriasAsync()
     {
         var categorias = await _localStorage.GetItemAsync<List<Categoria>>(KEY_CATEGORIAS);
+        
         if (categorias == null || !categorias.Any())
         {
-            categorias = CargarCategoriasSemilla();
+            categorias = GetCategoriasSemilla();
             await _localStorage.SetItemAsync(KEY_CATEGORIAS, categorias);
         }
+
         return categorias;
     }
 
-    // --- PRODUCTOS ---
+    public async Task GuardarCategoriaAsync(Categoria nuevaCat)
+    {
+        var categorias = await ObtenerCategoriasAsync();
+        categorias.Add(nuevaCat);
+        await _localStorage.SetItemAsync(KEY_CATEGORIAS, categorias);
+    }
+
     public async Task<List<Producto>> ObtenerProductosAsync()
     {
         return await _localStorage.GetItemAsync<List<Producto>>(KEY_PRODUCTOS) ?? new List<Producto>();
     }
 
-    public async Task GuardarProductoAsync(Producto producto)
+    public async Task GuardarProductoAsync(Producto prod)
     {
         var productos = await ObtenerProductosAsync();
-        var index = productos.FindIndex(p => p.Id == producto.Id);
+        var index = productos.FindIndex(p => p.Id == prod.Id);
         if (index >= 0)
-            productos[index] = producto;
+        {
+            productos[index] = prod;
+        }
         else
-            productos.Add(producto);
-
+        {
+            productos.Add(prod);
+        }
         await _localStorage.SetItemAsync(KEY_PRODUCTOS, productos);
     }
 
-    // --- LISTA / CARRITO DEL SÚPER ---
     public async Task<List<ItemLista>> ObtenerListaActualAsync()
     {
-        return await _localStorage.GetItemAsync<List<ItemLista>>(KEY_CARRITO) ?? new List<ItemLista>();
+        return await _localStorage.GetItemAsync<List<ItemLista>>(KEY_LISTA) ?? new List<ItemLista>();
     }
 
     public async Task GuardarListaActualAsync(List<ItemLista> lista)
     {
-        await _localStorage.SetItemAsync(KEY_CARRITO, lista);
+        await _localStorage.SetItemAsync(KEY_LISTA, lista);
     }
 
-    // --- CATEGORÍAS BASE POR DEFECTO ---
-    private List<Categoria> CargarCategoriasSemilla()
+    private List<Categoria> GetCategoriasSemilla()
     {
         return new List<Categoria>
         {
-            new Categoria { Nombre = "Abarrotes y Despensa", Icono = "🥫", ColorHex = "#F59E0B" },
-            new Categoria { Nombre = "Frutas y Verduras", Icono = "🍎", ColorHex = "#10B981" },
-            new Categoria { Nombre = "Lácteos y Huevo", Icono = "🥛", ColorHex = "#3B82F6" },
-            new Categoria { Nombre = "Carnes y Pescados", Icono = "🥩", ColorHex = "#EF4444" },
-            new Categoria { Nombre = "Limpieza del Hogar", Icono = "🧹", ColorHex = "#8B5CF6" },
-            new Categoria { Nombre = "Cuidado Personal", Icono = "🧴", ColorHex = "#EC4899" },
-            new Categoria { Nombre = "Bebidas y Botanas", Icono = "🥤", ColorHex = "#06B6D4" }
+            new Categoria { Nombre = "Abarrotes y Despensa", Icono = "🥫" },
+            new Categoria { Nombre = "Lácteos y Huevos", Icono = "🥛" },
+            new Categoria { Nombre = "Frutas y Verduras", Icono = "🍎" },
+            new Categoria { Nombre = "Carnes y Pescados", Icono = "🥩" },
+            new Categoria { Nombre = "Limpieza del Hogar", Icono = "🧹" },
+            new Categoria { Nombre = "Cuidado Personal", Icono = "🧴" },
+            new Categoria { Nombre = "Bebidas y Botanas", Icono = "🥤" },
+            new Categoria { Nombre = "Mascotas", Icono = "🐶" },
+            new Categoria { Nombre = "Otros", Icono = "📦" }
         };
     }
 }

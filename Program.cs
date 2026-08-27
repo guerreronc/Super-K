@@ -10,4 +10,5 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 // Registrar servicios locales nativos de SUPER-K
 builder.Services.AddScoped<SuperK.Services.LocalStorageService>();
 builder.Services.AddScoped<SuperK.Services.StorageService>();
+builder.Services.AddScoped<SuperK.Services.OpenFoodFactsService>();
 await builder.Build().RunAsync();

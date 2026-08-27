@@ -1,113 +1,103 @@
 window.superKScanner = {
-    html5QrcodeScanner: null,
-    isTransitioning: false,
+    isScanning: false,
+    lecturasBuffer: [],
+    ULTIMO_CODIGO_CONFIRMADO: null,
 
-    iniciarEscaner: async function (dotNetHelper) {
-        if (this.isTransitioning) return;
-        this.isTransitioning = true;
+    iniciarEscaner: function (dotNetHelper) {
+        this.detenerEscaner();
+        this.lecturasBuffer = [];
+        this.ULTIMO_CODIGO_CONFIRMADO = null;
 
-        await this.detenerEscanerInterno();
-
-        setTimeout(async () => {
+        setTimeout(() => {
             const element = document.getElementById("reader");
-            if (!element) {
-                this.isTransitioning = false;
-                return;
-            }
+            if (!element) return;
 
-            const formatsToSupport = [
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.CODE_128
-            ];
+            this.isScanning = true;
 
-            const config = {
-                fps: 20,
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
-                }
-            };
-
-            const onScanSuccess = (decodedText) => {
-                this.reproducirBeep();
-                if (dotNetHelper) {
-                    dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
-                }
-            };
-
-            try {
-                // Intento 1: Modo celular con cámara trasera y resolución ideal
-                this.html5QrcodeScanner = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport, verbose: false });
-                
-                await this.html5QrcodeScanner.start(
-                    { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
-                    config,
-                    onScanSuccess,
-                    () => {}
-                );
-                await this.aplicarZoomOpcional();
-            } catch (err) {
-                // Si falla (como en la PC), destruimos la instancia atascada antes de reintentar
-                await this.detenerEscanerInterno();
-
-                try {
-                    const devices = await Html5Qrcode.getCameras();
-                    if (devices && devices.length > 0) {
-                        // Seleccionar la última cámara si hay varias (trasera), o la primera (webcam PC)
-                        const cameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
-                        
-                        // Creamos una instancia nueva y limpia
-                        this.html5QrcodeScanner = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport, verbose: false });
-                        await this.html5QrcodeScanner.start(cameraId, config, onScanSuccess, () => {});
-                        await this.aplicarZoomOpcional();
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: element,
+                    constraints: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
-                } catch (fallbackErr) {
-                    console.error("Error al iniciar cámara de respaldo:", fallbackErr);
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2,
+                decoder: {
+                    // Nos enfocamos en los formatos comerciales reales para reducir falsos positivos
+                    readers: [
+                        "ean_reader",     // EAN-13 (El estándar de súper como el 7501114507919)
+                        "upc_reader",     // UPC-A (Productos americanos)
+                        "ean_8_reader",   // EAN-8 (Empaques muy pequeños)
+                        "upc_e_reader"    // UPC-E
+                    ],
+                    multiple: false
+                },
+                locate: true
+            }, (err) => {
+                if (err) {
+                    console.error("Error al inicializar Quagga2:", err);
+                    this.isScanning = false;
+                    return;
                 }
-            } finally {
-                this.isTransitioning = false;
-            }
+                Quagga.start();
+            });
+
+            // Callback con filtro de votos por consenso
+            Quagga.onDetected((result) => {
+                if (!this.isScanning) return;
+
+                if (result && result.codeResult && result.codeResult.code) {
+                    const codigoCandidato = result.codeResult.code.trim();
+
+                    // 1. Descartar lecturas de menos de 7 dígitos (falsos positivos de ruido)
+                    if (codigoCandidato.length < 7) return;
+
+                    // 2. Acumular lectura en el buffer de validación
+                    this.lecturasBuffer.push(codigoCandidato);
+
+                    // Mantener solo las últimas 4 lecturas
+                    if (this.lecturasBuffer.length > 4) {
+                        this.lecturasBuffer.shift();
+                    }
+
+                    // 3. Validar si los últimos 2 fotogramas leyeron EXACTAMENTE lo mismo
+                    if (this.lecturasBuffer.length >= 2) {
+                        const ultimasDos = this.lecturasBuffer.slice(-2);
+                        const esConsistente = ultimasDos.every(val => val === ultimasDos[0]);
+
+                        if (esConsistente && this.ULTIMO_CODIGO_CONFIRMADO !== ultimasDos[0]) {
+                            this.ULTIMO_CODIGO_CONFIRMADO = ultimasDos[0];
+                            this.isScanning = false;
+
+                            this.reproducirBeep();
+                            this.detenerEscaner();
+
+                            if (dotNetHelper) {
+                                dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', this.ULTIMO_CODIGO_CONFIRMADO);
+                            }
+                        }
+                    }
+                }
+            });
+
         }, 300);
     },
 
-    aplicarZoomOpcional: async function () {
+    detenerEscaner: function () {
+        this.isScanning = false;
+        this.lecturasBuffer = [];
         try {
-            if (!this.html5QrcodeScanner) return;
-            const track = this.html5QrcodeScanner.getRunningTrack();
-            if (track && track.getCapabilities) {
-                const capabilities = track.getCapabilities();
-                if (capabilities.zoom) {
-                    const zoomTarget = Math.min(capabilities.zoom.max, 1.8);
-                    await track.applyConstraints({ advanced: [{ zoom: zoomTarget }] });
-                }
-            }
-        } catch (zErr) {}
-    },
-
-    detenerEscaner: async function () {
-        this.isTransitioning = true;
-        await this.detenerEscanerInterno();
-        this.isTransitioning = false;
-    },
-
-    detenerEscanerInterno: async function () {
-        if (this.html5QrcodeScanner) {
-            try {
-                const state = this.html5QrcodeScanner.getState();
-                if (state === 2 || state === 3) {
-                    await this.html5QrcodeScanner.stop();
-                }
-            } catch (err) {
-                console.warn("Aviso al detener escáner:", err);
-            } finally {
-                try {
-                    this.html5QrcodeScanner.clear();
-                } catch (e) {}
-                this.html5QrcodeScanner = null;
-            }
-        }
+            Quagga.offDetected();
+            Quagga.stop();
+        } catch (e) {}
     },
 
     reproducirBeep: function () {

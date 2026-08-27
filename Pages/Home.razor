@@ -1,6 +1,9 @@
 ﻿@page "/"
 @inject StorageService Storage
 @inject IJSRuntime JS
+@inject OpenFoodFactsService OFFService
+@implements IDisposable
+
 <div class="sk-container">
 
     <!-- Header Principal -->
@@ -9,31 +12,57 @@
             <img src="icon.svg" width="40" height="40" class="sk-logo-img" alt="SUPER-K" />
             <div>
                 <h1 class="sk-title">SUPER-K</h1>
-                <p class="sk-subtitle">Control de Súper & Despensa</p>
+                <p class="sk-subtitle">@(EnModoCompra ? "🛒 Hacer el Súper" : "📋 Planeación de Lista")</p>
             </div>
         </div>
         
         <div class="sk-badge-total">
-            <span class="sk-badge-label">Estimado</span>
-            <span class="sk-badge-amount">$@TotalEstimado.ToString("F2")</span>
+            <span class="sk-badge-label">@(EnModoCompra ? "En Carrito" : "Estimado")</span>
+            <span class="sk-badge-amount" style="color: @(EnModoCompra ? "#10b981" : "#f59e0b")">
+                $@(EnModoCompra ? TotalCarritoReal.ToString("F2") : TotalEstimado.ToString("F2"))
+            </span>
         </div>
     </header>
 
-    <!-- Botones Rápidos -->
-    <div class="sk-grid-buttons">
-        <button @onclick="AbrirModalNuevoProducto" class="sk-btn-primary">
-            <span>➕</span> Agregar
-        </button>
-        <button @onclick="AbrirEscanerCamara" class="sk-btn-secondary">
-            <span>📷</span> Escanear
-        </button>
+    <!-- Control del Modo de Compra -->
+    <div style="margin-bottom: 16px;">
+        @if (!EnModoCompra)
+        {
+            <button @onclick="IniciarModoCompra" class="sk-btn-primary" style="width:100%; padding: 12px; font-weight:bold; font-size:1rem; background:#10b981;">
+                🚀 ¡Hacer el Súper!
+            </button>
+        }
+        else
+        {
+            <div style="display:flex; gap:8px;">
+                <button @onclick="AbrirEscanerCamara" class="sk-btn-primary" style="flex:2; padding: 12px; font-weight:bold;">
+                    📷 Escanear Producto
+                </button>
+                <button @onclick="FinalizarYEnviarADespensa" class="sk-btn-secondary" style="flex:1; background:#6366f1; color:white; font-weight:bold;">
+                    ✅ Finalizar Compra
+                </button>
+            </div>
+        }
     </div>
 
-    <!-- Tarjeta de Lista -->
+    <!-- Botones Secundarios en Modo Planeación -->
+    @if (!EnModoCompra)
+    {
+        <div class="sk-grid-buttons" style="margin-bottom: 16px;">
+            <button @onclick="AbrirModalNuevoProducto" class="sk-btn-secondary">
+                <span>➕</span> Agregar a la Lista
+            </button>
+            <button @onclick="AbrirEscanerCamara" class="sk-btn-secondary">
+                <span>📷</span> Escanear en Despensa
+            </button>
+        </div>
+    }
+
+    <!-- Tarjeta de Lista del Súper -->
     <div class="sk-card">
         <div class="sk-card-header">
-            <span class="sk-card-title">🛒 Lista del Súper (@ListaActual.Count)</span>
-            @if (ListaActual.Any())
+            <span class="sk-card-title">🛒 Productos (@ListaActual.Count)</span>
+            @if (ListaActual.Any() && !EnModoCompra)
             {
                 <button @onclick="LimpiarLista" class="sk-btn-text-danger">Vaciar lista</button>
             }
@@ -44,7 +73,6 @@
             <div class="sk-empty-state">
                 <p style="font-size: 2.5rem; margin-bottom: 8px;">🛍️</p>
                 <p style="font-weight: 600; color: #f8fafc; font-size: 0.9rem;">Tu lista está vacía</p>
-                <p style="font-size: 0.75rem; margin-top: 4px;">Escanea un código de barras o agrega un producto.</p>
             </div>
         }
         else
@@ -53,26 +81,33 @@
                 @foreach (var item in ListaActual)
                 {
                     var prod = Productos.FirstOrDefault(p => p.Id == item.ProductoId);
-                    <div class="sk-item">
+                    <div class="sk-item" style="border-left: 4px solid @(item.EnCarrito ? "#10b981" : "#334155"); padding-left: 8px;">
                         <div class="sk-item-left">
                             <input type="checkbox" checked="@item.EnCarrito" @onchange="() => ToggleCarrito(item)" class="sk-checkbox" />
                             <div>
                                 <p class="sk-item-name @(item.EnCarrito ? "completed" : "")">
                                     @(prod?.Nombre ?? "Producto")
                                 </p>
-                                <p class="sk-item-price">
-                                    $@item.PrecioEnCaja x @item.CantidadPlaneada @(prod?.UnidadMedida ?? "Pza")
+                                <p class="sk-item-price" style="font-size:0.75rem;">
+                                    @if (EnModoCompra && item.EnCarrito)
+                                    {
+                                        <span>Real: <strong>$@item.PrecioRealEnCaja</strong> x @item.CantidadEnCarrito</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Est: $@item.PrecioEstimado x @item.CantidadPlaneada</span>
+                                    }
                                 </p>
+                                @if (!string.IsNullOrEmpty(item.FotoOfertaBase64))
+                                {
+                                    <span style="font-size:0.65rem; background:#7c3aed; color:white; padding:2px 6px; border-radius:4px;">📷 Oferta Capturada</span>
+                                }
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center;">
-                            <div class="sk-qty-box">
-                                <button @onclick="() => CambiarCantidad(item, -1)" class="sk-btn-qty">-</button>
-                                <span class="sk-qty-num">@item.CantidadPlaneada</span>
-                                <button @onclick="() => CambiarCantidad(item, 1)" class="sk-btn-qty">+</button>
-                            </div>
-                            <span class="sk-item-subtotal">$@item.Subtotal.ToString("F2")</span>
+                        <div style="display: flex; align-items: center; gap:8px;">
+                            <button @onclick="() => EditarItem(item)" style="background:none; border:none; cursor:pointer; font-size:1rem;">✏️</button>
+                            <span class="sk-item-subtotal">$@(item.EnCarrito ? item.SubtotalReal.ToString("F2") : item.SubtotalEstimado.ToString("F2"))</span>
                         </div>
                     </div>
                 }
@@ -82,7 +117,7 @@
 
 </div>
 
-<!-- Menú Inferior Nivel App Móvil -->
+<!-- Menú Inferior -->
 <nav class="sk-bottom-nav">
     <div class="sk-nav-container">
         <button class="sk-nav-btn active">
@@ -109,38 +144,36 @@
                 <h3 style="color:#10b981; font-size:1rem; font-weight:bold;">Escanear Código de Barras</h3>
                 <button @onclick="CerrarCamara" class="sk-btn-text-danger">✕ Cerrar</button>
             </div>
-
-            <!-- Contenedor donde JS montará la cámara -->
-            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto;"></div>
-
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto; min-height: 250px;"></div>
             <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 12px;">
-                Apunta con la cámara al código de barras del producto.
+                @(EnModoCompra ? "Escanea un producto para marcarlo en caja." : "Escanea para agregar o registrar en tu despensa.")
             </p>
         </div>
     </div>
 }
 
-<!-- Modal Agregar Producto -->
+<!-- Modal Agregar Producto / Registrar Nuevo -->
 @if (MostrarModal)
 {
     <div class="sk-modal-overlay">
         <div class="sk-modal-card">
             <h3 style="color:#10b981; font-size:1rem; margin-bottom:12px; font-weight:bold;">
-                @(string.IsNullOrEmpty(NuevoCodigo) ? "Agregar Producto" : "Nuevo Producto Detectado")
+                @(string.IsNullOrEmpty(NuevoCodigo) ? "Agregar Producto a la Lista" : "Producto No Registrado")
             </h3>
             
             @if (!string.IsNullOrEmpty(NuevoCodigo))
             {
                 <div style="background: rgba(16,185,129,0.1); border: 1px dashed #10b981; padding: 6px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.75rem; color: #10b981;">
-                    Código: <strong>@NuevoCodigo</strong>
+                    Código escaneado: <strong>@NuevoCodigo</strong>
                 </div>
             }
 
             <div class="sk-form-group">
                 <label class="sk-label">Nombre del producto</label>
-                <input type="text" @bind="NuevoNombre" class="sk-input" placeholder="Ej. Aceite de Cocina 1L" />
+                <input type="text" @bind="NuevoNombre" class="sk-input" placeholder="Ej. Aceite 1L" />
             </div>
 
+            <!-- Selector de Categorías -->
             <div class="sk-form-group">
                 <label class="sk-label">Categoría</label>
                 <select @bind="CategoriaSeleccionadaId" class="sk-select">
@@ -148,13 +181,25 @@
                     {
                         <option value="@cat.Id">@cat.Icono @cat.Nombre</option>
                     }
+                    <option value="NUEVA_CATEGORIA">➕ Crear nueva categoría...</option>
                 </select>
             </div>
+
+            @if (CategoriaSeleccionadaId == "NUEVA_CATEGORIA")
+            {
+                <div style="background:#1e293b; padding:10px; border-radius:8px; margin-bottom:12px; border:1px solid #334155;">
+                    <label class="sk-label" style="color:#38bdf8;">Nombre de la nueva categoría</label>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" @bind="NuevoIconoCategoria" class="sk-input" style="width:50px; text-align:center;" placeholder="📦" />
+                        <input type="text" @bind="NuevoNombreCategoria" class="sk-input" placeholder="Ej. Mascotas, Bebés..." />
+                    </div>
+                </div>
+            }
 
             <div class="sk-grid-2 sk-form-group">
                 <div>
                     <label class="sk-label">Precio ($)</label>
-                    <input type="number" step="0.5" @bind="NuevoPrecio" class="sk-input" />
+                    <input type="number" step="0.5" @bind="NuevoPrecio" class="sk-input" placeholder="0.00" />
                 </div>
                 <div>
                     <label class="sk-label">Cantidad</label>
@@ -170,130 +215,264 @@
     </div>
 }
 
+<!-- Modal de Confirmación / Edición en Caja -->
+@if (MostrarModalConfirmarCompra && ItemSeleccionadoParaCompra != null)
+{
+    var prod = Productos.FirstOrDefault(p => p.Id == ItemSeleccionadoParaCompra.ProductoId);
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card">
+            <h3 style="color:#10b981; font-size:1.1rem; margin-bottom:8px; font-weight:bold;">
+                🛒 Confirmar en Carrito
+            </h3>
+            <p style="color:#f8fafc; font-weight:600; margin-bottom:12px;">@(prod?.Nombre ?? "Producto Escaneado")</p>
+
+            <div class="sk-form-group">
+                <label class="sk-label">Precio Real en Caja / Anaquel ($)</label>
+                <input type="number" step="0.5" @bind="ItemSeleccionadoParaCompra.PrecioRealEnCaja" class="sk-input" style="font-size:1.2rem; color:#10b981; font-weight:bold;" />
+            </div>
+
+            <div class="sk-form-group">
+                <label class="sk-label">Cantidad a Llevar</label>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button @onclick="() => ItemSeleccionadoParaCompra.CantidadEnCarrito = Math.Max(1, ItemSeleccionadoParaCompra.CantidadEnCarrito - 1)" class="sk-btn-qty" style="width:40px; height:40px; font-size:1.2rem;">-</button>
+                    <span style="font-size:1.4rem; font-weight:bold; color:white;">@ItemSeleccionadoParaCompra.CantidadEnCarrito</span>
+                    <button @onclick="() => ItemSeleccionadoParaCompra.CantidadEnCarrito++" class="sk-btn-qty" style="width:40px; height:40px; font-size:1.2rem;">+</button>
+                </div>
+            </div>
+
+            <div class="sk-form-group" style="margin-top:12px;">
+                <label class="sk-label">📷 Evidencia de Oferta / Descuento</label>
+                <InputFile OnChange="CapturarFotoOferta" accept="image/*" capture="environment" class="sk-input" style="padding:6px;" />
+                @if (!string.IsNullOrEmpty(ItemSeleccionadoParaCompra.FotoOfertaBase64))
+                {
+                    <p style="color:#10b981; font-size:0.75rem; margin-top:4px;">✓ Foto cargada</p>
+                }
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                <button @onclick="() => MostrarModalConfirmarCompra = false" class="sk-btn-secondary">Cancelar</button>
+                <button @onclick="ConfirmarAgregarAlCarrito" class="sk-btn-primary" style="padding:10px 20px; font-weight:bold;">
+                    🛒 Meter al Carrito ($@((ItemSeleccionadoParaCompra.PrecioRealEnCaja * ItemSeleccionadoParaCompra.CantidadEnCarrito).ToString("F2")))
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<Categoria> Categorias = new();
     private List<Producto> Productos = new();
     private List<ItemLista> ListaActual = new();
 
+    private bool EnModoCompra = false;
     private bool MostrarModal = false;
     private bool MostrarCamara = false;
+    private bool MostrarModalConfirmarCompra = false;
 
-    private string NuevoNombre = "";
-    private string NuevoCodigo = "";
-    private string CategoriaSeleccionadaId = "";
-    private decimal NuevoPrecio = 25.00m;
+    // Campos de alta de producto
+    private string NuevoCodigo = string.Empty;
+    private string NuevoNombre = string.Empty;
+    private string CategoriaSeleccionadaId = string.Empty;
+    private decimal NuevoPrecio = 0m;
     private int NuevaCantidad = 1;
 
-    private DotNetObjectReference<Home>? dotNetHelper;
+    // Campos de alta de nueva categoría sobre la marcha
+    private string NuevoNombreCategoria = string.Empty;
+    private string NuevoIconoCategoria = "📦";
 
-    private decimal TotalEstimado => ListaActual.Sum(i => i.Subtotal);
+    private ItemLista? ItemSeleccionadoParaCompra;
+
+    private decimal TotalEstimado => ListaActual.Sum(i => i.SubtotalEstimado);
+    private decimal TotalCarritoReal => ListaActual.Where(i => i.EnCarrito).Sum(i => i.SubtotalReal);
+
+    private DotNetObjectReference<Home>? dotNetHelper;
 
     protected override async Task OnInitializedAsync()
     {
         Categorias = await Storage.ObtenerCategoriasAsync();
         Productos = await Storage.ObtenerProductosAsync();
         ListaActual = await Storage.ObtenerListaActualAsync();
+        dotNetHelper = DotNetObjectReference.Create(this);
 
         if (Categorias.Any())
+        {
             CategoriaSeleccionadaId = Categorias.First().Id;
-
-        dotNetHelper = DotNetObjectReference.Create(this);
-    }
-
-    private async Task AbrirEscanerCamara()
-    {
-        MostrarCamara = true;
-        StateHasChanged(); 
-
-        // Pausa breve para asegurar que Blazor pinte el <div id="reader"> en el HTML
-        await Task.Delay(100); 
-
-        // Asegurar que dotNetHelper esté creado
-        dotNetHelper ??= DotNetObjectReference.Create(this);
-
-        await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
-    }
-
-    private async Task CerrarCamara()
-    {
-        MostrarCamara = false;
-        await JS.InvokeVoidAsync("superKScanner.detenerEscaner");
-    }
-
-    [JSInvokable]
-    public async Task OnCodigoEscaneado(string codigo)
-    {
-        await CerrarCamara();
-
-        // Buscar si el producto ya existe en el catálogo por su código de barras
-        var productoExistente = Productos.FirstOrDefault(p => p.CodigoBarras == codigo);
-
-        if (productoExistente != null)
-        {
-            // Si existe, revisamos si ya está en la lista actual
-            var itemEnLista = ListaActual.FirstOrDefault(i => i.ProductoId == productoExistente.Id);
-            if (itemEnLista != null)
-            {
-                itemEnLista.CantidadPlaneada++;
-            }
-            else
-            {
-                ListaActual.Add(new ItemLista
-                {
-                    ProductoId = productoExistente.Id,
-                    CantidadPlaneada = 1,
-                    PrecioEnCaja = productoExistente.UltimoPrecio
-                });
-            }
-            await Storage.GuardarListaActualAsync(ListaActual);
         }
-        else
-        {
-            // Si es un producto nuevo, abrimos el modal precargando el código
-            NuevoCodigo = codigo;
-            NuevoNombre = "";
-            AbrirModalNuevoProducto();
-        }
-
-        StateHasChanged();
     }
 
-    private void AbrirModalNuevoProducto() => MostrarModal = true;
-    
+    private void IniciarModoCompra()
+    {
+        EnModoCompra = true;
+    }
+
+    private void AbrirModalNuevoProducto()
+    {
+        NuevoCodigo = string.Empty;
+        NuevoNombre = string.Empty;
+        NuevoPrecio = 0m;
+        NuevaCantidad = 1;
+        NuevoNombreCategoria = string.Empty;
+        NuevoIconoCategoria = "📦";
+        MostrarModal = true;
+    }
+
     private void CerrarModal()
     {
         MostrarModal = false;
-        NuevoCodigo = "";
     }
 
     private async Task GuardarNuevoProducto()
     {
         if (string.IsNullOrWhiteSpace(NuevoNombre)) return;
 
-        var producto = new Producto
+        string idCategoriaFinal = CategoriaSeleccionadaId;
+        if (CategoriaSeleccionadaId == "NUEVA_CATEGORIA")
         {
-            Nombre = NuevoNombre,
+            if (string.IsNullOrWhiteSpace(NuevoNombreCategoria)) return;
+
+            var nuevaCat = new Categoria
+            {
+                Id = Guid.NewGuid().ToString(),
+                Nombre = NuevoNombreCategoria.Trim(),
+                Icono = string.IsNullOrWhiteSpace(NuevoIconoCategoria) ? "📦" : NuevoIconoCategoria.Trim(),
+                EsPersonalizada = true
+            };
+
+            await Storage.GuardarCategoriaAsync(nuevaCat);
+            Categorias.Add(nuevaCat);
+            idCategoriaFinal = nuevaCat.Id;
+            CategoriaSeleccionadaId = idCategoriaFinal;
+        }
+
+        var nuevoProd = new Producto
+        {
+            Id = Guid.NewGuid().ToString(),
+            Nombre = NuevoNombre.Trim(),
             CodigoBarras = NuevoCodigo,
-            CategoriaId = CategoriaSeleccionadaId,
+            CategoriaId = idCategoriaFinal,
             UltimoPrecio = NuevoPrecio
         };
 
-        await Storage.GuardarProductoAsync(producto);
-        Productos.Add(producto);
+        Productos.Add(nuevoProd);
+        await Storage.GuardarProductoAsync(nuevoProd);
 
-        var item = new ItemLista
+        var nuevoItem = new ItemLista
         {
-            ProductoId = producto.Id,
-            CantidadPlaneada = NuevaCantidad,
-            PrecioEnCaja = NuevoPrecio
+            ProductoId = nuevoProd.Id,
+            CantidadPlaneada = NuevaCantidad > 0 ? NuevaCantidad : 1,
+            PrecioEstimado = NuevoPrecio,
+            EnCarrito = EnModoCompra
         };
 
-        ListaActual.Add(item);
+        if (EnModoCompra)
+        {
+            nuevoItem.CantidadEnCarrito = nuevoItem.CantidadPlaneada;
+            nuevoItem.PrecioRealEnCaja = NuevoPrecio;
+        }
+
+        ListaActual.Add(nuevoItem);
         await Storage.GuardarListaActualAsync(ListaActual);
 
-        NuevoNombre = "";
-        NuevoCodigo = "";
         CerrarModal();
+    }
+
+    [JSInvokable]
+    public async Task OnCodigoEscaneado(string codigo)
+    {
+        // Tu scanner.js ya detuvo Quagga internamente, aquí cerramos el modal visual en Blazor
+        MostrarCamara = false;
+
+        var prod = Productos.FirstOrDefault(p => p.CodigoBarras == codigo);
+
+        if (prod == null)
+        {
+            // Código no encontrado: Abrir modal de alta precargando el código
+            NuevoCodigo = codigo;
+            NuevoNombre = string.Empty;
+            NuevoPrecio = 0m;
+            NuevaCantidad = 1;
+            MostrarModal = true;
+        }
+        else
+        {
+            // Código existente: Buscar o agregar a la lista actual y pedir confirmación
+            var item = ListaActual.FirstOrDefault(i => i.ProductoId == prod.Id);
+            if (item == null)
+            {
+                item = new ItemLista
+                {
+                    ProductoId = prod.Id,
+                    CantidadPlaneada = 1,
+                    PrecioEstimado = prod.UltimoPrecio
+                };
+                ListaActual.Add(item);
+            }
+
+            ItemSeleccionadoParaCompra = item;
+            ItemSeleccionadoParaCompra.PrecioRealEnCaja = prod.UltimoPrecio > 0 ? prod.UltimoPrecio : 0m;
+            ItemSeleccionadoParaCompra.CantidadEnCarrito = item.CantidadPlaneada > 0 ? item.CantidadPlaneada : 1;
+
+            MostrarModalConfirmarCompra = true;
+        }
+
+        // Fuerza a Blazor a refrescar los modales en pantalla de forma sincrónica con la llamada de JS
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ConfirmarAgregarAlCarrito()
+    {
+        if (ItemSeleccionadoParaCompra != null)
+        {
+            ItemSeleccionadoParaCompra.EnCarrito = true;
+
+            var prod = Productos.FirstOrDefault(p => p.Id == ItemSeleccionadoParaCompra.ProductoId);
+            if (prod != null)
+            {
+                prod.UltimoPrecio = ItemSeleccionadoParaCompra.PrecioRealEnCaja;
+                await Storage.GuardarProductoAsync(prod);
+            }
+
+            await Storage.GuardarListaActualAsync(ListaActual);
+        }
+
+        MostrarModalConfirmarCompra = false;
+        ItemSeleccionadoParaCompra = null;
+    }
+
+    private async Task CapturarFotoOferta(InputFileChangeEventArgs e)
+    {
+        var archivo = e.File;
+        if (archivo != null && ItemSeleccionadoParaCompra != null)
+        {
+            using var stream = archivo.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            ItemSeleccionadoParaCompra.FotoOfertaBase64 = $"data:{archivo.ContentType};base64,{Convert.ToBase64String(bytes)}";
+        }
+    }
+
+    private async Task FinalizarYEnviarADespensa()
+    {
+        EnModoCompra = false;
+        await Storage.GuardarListaActualAsync(ListaActual);
+    }
+
+    private async Task AbrirEscanerCamara()
+    {
+        MostrarCamara = true;
+        await Task.Delay(100); // Pequeño margen para asegurar que el div #reader existe en el DOM
+        await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
+    }
+
+    private async Task CerrarCamara()
+    {
+        MostrarCamara = false;
+        try
+        {
+            await JS.InvokeVoidAsync("superKScanner.detenerEscaner");
+        }
+        catch { }
     }
 
     private async Task ToggleCarrito(ItemLista item)
@@ -302,14 +481,10 @@
         await Storage.GuardarListaActualAsync(ListaActual);
     }
 
-    private async Task CambiarCantidad(ItemLista item, decimal cambio)
+    private void EditarItem(ItemLista item)
     {
-        item.CantidadPlaneada += cambio;
-        if (item.CantidadPlaneada <= 0)
-        {
-            ListaActual.Remove(item);
-        }
-        await Storage.GuardarListaActualAsync(ListaActual);
+        ItemSeleccionadoParaCompra = item;
+        MostrarModalConfirmarCompra = true;
     }
 
     private async Task LimpiarLista()
@@ -318,8 +493,5 @@
         await Storage.GuardarListaActualAsync(ListaActual);
     }
 
-    public void Dispose()
-    {
-        dotNetHelper?.Dispose();
-    }
+    public void Dispose() => dotNetHelper?.Dispose();
 }

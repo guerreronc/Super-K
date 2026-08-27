@@ -4,13 +4,21 @@ public class ItemLista
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string ProductoId { get; set; } = string.Empty;
+    
+    // Planeación
     public decimal CantidadPlaneada { get; set; } = 1;
-    public decimal CantidadComprada { get; set; } = 0;
-    public decimal PrecioEnCaja { get; set; }
+    public decimal PrecioEstimado { get; set; }
+
+    // En Caja / Carrito
+    public decimal CantidadEnCarrito { get; set; } = 0;
+    public decimal PrecioRealEnCaja { get; set; }
     public bool EnCarrito { get; set; } = false;
-    public string? FotoPromocionBase64 { get; set; } // Evidencia de oferta
+    
+    // Evidencia y Notas
+    public string? FotoOfertaBase64 { get; set; }
     public string? Notas { get; set; }
 
-    // Propiedad calculada para el subtotal
-    public decimal Subtotal => EnCarrito ? (CantidadComprada * PrecioEnCaja) : (CantidadPlaneada * PrecioEnCaja);
+    // Subtotales calculados
+    public decimal SubtotalEstimado => CantidadPlaneada * PrecioEstimado;
+    public decimal SubtotalReal => CantidadEnCarrito * PrecioRealEnCaja;
 }
