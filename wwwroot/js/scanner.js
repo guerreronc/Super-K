@@ -1,12 +1,19 @@
 window.superKScanner = {
     html5QrcodeScanner: null,
+    isTransitioning: false,
 
-    iniciarEscaner: function (dotNetHelper) {
-        this.detenerEscaner();
+    iniciarEscaner: async function (dotNetHelper) {
+        if (this.isTransitioning) return;
+        this.isTransitioning = true;
 
-        setTimeout(() => {
+        await this.detenerEscanerInterno();
+
+        setTimeout(async () => {
             const element = document.getElementById("reader");
-            if (!element) return;
+            if (!element) {
+                this.isTransitioning = false;
+                return;
+            }
 
             const formatsToSupport = [
                 Html5QrcodeSupportedFormats.EAN_13,
@@ -17,64 +24,89 @@ window.superKScanner = {
             ];
 
             const config = {
-                fps: 30,
-                // Recuadro horizontal en el centro para concentrar el procesamiento en las barras
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    return {
-                        width: Math.floor(viewfinderWidth * 0.85),
-                        height: Math.floor(viewfinderHeight * 0.35)
-                    };
-                },
+                fps: 20,
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
                 }
             };
 
-            this.html5QrcodeScanner = new Html5Qrcode("reader", {
-                formatsToSupport: formatsToSupport,
-                verbose: false
-            });
+            const onScanSuccess = (decodedText) => {
+                this.reproducirBeep();
+                if (dotNetHelper) {
+                    dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
+                }
+            };
 
-            this.html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                config,
-                (decodedText) => {
-                    this.reproducirBeep();
-                    if (dotNetHelper) {
-                        dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
-                    }
-                },
-                (errorMessage) => {}
-            ).catch(err => {
-                Html5Qrcode.getCameras().then(devices => {
+            try {
+                // Intento 1: Modo celular con cámara trasera y resolución ideal
+                this.html5QrcodeScanner = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport, verbose: false });
+                
+                await this.html5QrcodeScanner.start(
+                    { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    config,
+                    onScanSuccess,
+                    () => {}
+                );
+                await this.aplicarZoomOpcional();
+            } catch (err) {
+                // Si falla (como en la PC), destruimos la instancia atascada antes de reintentar
+                await this.detenerEscanerInterno();
+
+                try {
+                    const devices = await Html5Qrcode.getCameras();
                     if (devices && devices.length > 0) {
+                        // Seleccionar la última cámara si hay varias (trasera), o la primera (webcam PC)
                         const cameraId = devices.length > 1 ? devices[devices.length - 1].id : devices[0].id;
-                        this.html5QrcodeScanner.start(
-                            cameraId,
-                            config,
-                            (decodedText) => {
-                                this.reproducirBeep();
-                                if (dotNetHelper) {
-                                    dotNetHelper.invokeMethodAsync('OnCodigoEscaneado', decodedText);
-                                }
-                            },
-                            (errorMessage) => {}
-                        );
+                        
+                        // Creamos una instancia nueva y limpia
+                        this.html5QrcodeScanner = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport, verbose: false });
+                        await this.html5QrcodeScanner.start(cameraId, config, onScanSuccess, () => {});
+                        await this.aplicarZoomOpcional();
                     }
-                });
-            });
-
+                } catch (fallbackErr) {
+                    console.error("Error al iniciar cámara de respaldo:", fallbackErr);
+                }
+            } finally {
+                this.isTransitioning = false;
+            }
         }, 300);
     },
 
-    detenerEscaner: function () {
+    aplicarZoomOpcional: async function () {
+        try {
+            if (!this.html5QrcodeScanner) return;
+            const track = this.html5QrcodeScanner.getRunningTrack();
+            if (track && track.getCapabilities) {
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    const zoomTarget = Math.min(capabilities.zoom.max, 1.8);
+                    await track.applyConstraints({ advanced: [{ zoom: zoomTarget }] });
+                }
+            }
+        } catch (zErr) {}
+    },
+
+    detenerEscaner: async function () {
+        this.isTransitioning = true;
+        await this.detenerEscanerInterno();
+        this.isTransitioning = false;
+    },
+
+    detenerEscanerInterno: async function () {
         if (this.html5QrcodeScanner) {
-            this.html5QrcodeScanner.stop().then(() => {
-                this.html5QrcodeScanner.clear();
+            try {
+                const state = this.html5QrcodeScanner.getState();
+                if (state === 2 || state === 3) {
+                    await this.html5QrcodeScanner.stop();
+                }
+            } catch (err) {
+                console.warn("Aviso al detener escáner:", err);
+            } finally {
+                try {
+                    this.html5QrcodeScanner.clear();
+                } catch (e) {}
                 this.html5QrcodeScanner = null;
-            }).catch(err => {
-                this.html5QrcodeScanner = null;
-            });
+            }
         }
     },
 
