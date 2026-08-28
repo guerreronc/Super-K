@@ -1,0 +1,59 @@
+.sk-precios-container { max-width: 520px; margin: 0 auto; padding: 20px 16px; background-color: #f8fafc; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+.sk-precios-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.sk-btn-back { background: white; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 10px; font-weight: 600; cursor: pointer; color: #475569; font-size: 0.85rem; }
+.sk-precios-header h2 { margin: 0; font-size: 1.3rem; color: #0284c7; font-weight: 800; }
+.sk-precios-header p { margin: 0; font-size: 0.78rem; color: #64748b; }
+
+.sk-search-card { background: white; border-radius: 14px; padding: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.sk-search-row { display: flex; gap: 8px; }
+.sk-btn-scan { background: #0f172a; color: white; border: none; padding: 0 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+.sk-input-search { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #fff !important; color: #0f172a !important; }
+.sk-btn-search { background: #0284c7; color: white; border: none; padding: 0 14px; border-radius: 8px; font-size: 1.1rem; cursor: pointer; }
+
+.sk-loading-box { text-align: center; padding: 40px 20px; color: #0284c7; font-weight: 600; }
+.sk-spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #bae6fd; border-top-color: #0284c7; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.sk-placeholder-card { background: white; border-radius: 16px; padding: 30px 20px; text-align: center; border: 1px dashed #cbd5e1; color: #64748b; font-size: 0.9rem; }
+.sk-placeholder-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+.sk-result-card { background: white; border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.sk-product-header { display: flex; gap: 14px; align-items: center; }
+.sk-product-img { width: 70px; height: 70px; object-fit: contain; border-radius: 10px; border: 1px solid #f1f5f9; background: #fff; }
+.sk-product-img-placeholder { width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; font-size: 2rem; background: #f1f5f9; border-radius: 10px; color: #94a3b8; }
+.sk-product-meta { flex: 1; min-width: 0; }
+.sk-badge-code { background: #f1f5f9; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #475569; border: 1px solid #cbd5e1; }
+.sk-product-meta h3 { margin: 4px 0 2px 0; font-size: 1.05rem; color: #0f172a; font-weight: 800; line-height: 1.2; }
+.sk-brand-tag { font-size: 0.8rem; color: #64748b; font-weight: 600; }
+
+.sk-divider { border: none; border-top: 1px solid #f1f5f9; margin: 14px 0; }
+
+.sk-compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.sk-compare-box { padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; justify-content: space-between; }
+.sk-box-local { background: #f0f9ff; border-color: #bae6fd; }
+.sk-box-web { background: #f8fafc; border-color: #e2e8f0; }
+.sk-box-title { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #334155; margin-bottom: 8px; }
+
+.sk-price-display { display: flex; align-items: baseline; color: #0369a1; }
+.sk-currency { font-size: 1rem; font-weight: 800; }
+.sk-price-num { font-size: 1.5rem; font-weight: 900; }
+.sk-price-sub { font-size: 0.7rem; color: #0284c7; font-weight: 600; margin-top: 4px; }
+
+.sk-empty-local p { margin: 0; font-size: 0.78rem; color: #64748b; }
+.sk-tag-new { background: #dcfce7; color: #15803d; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px; }
+
+.sk-web-status { font-size: 0.75rem; color: #16a34a; font-weight: 700; display: block; }
+.sk-web-detail { font-size: 0.72rem; color: #64748b; margin: 4px 0 0 0; }
+.sk-empty-web { font-size: 0.75rem; color: #94a3b8; font-style: italic; }
+
+.sk-update-box { background: #fafafa; border: 1px solid #f1f5f9; padding: 12px; border-radius: 10px; }
+.sk-update-box h4 { margin: 0 0 8px 0; font-size: 0.85rem; color: #334155; font-weight: 700; }
+.sk-update-row { display: flex; gap: 10px; align-items: flex-end; }
+.sk-field { flex: 1; }
+.sk-field label { display: block; font-size: 0.72rem; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+.sk-input-price-edit { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; font-size: 1rem; color: #0f172a; background: #fff !important; box-sizing: border-box; }
+.sk-btn-save { background: #16a34a; color: white; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+
+.sk-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; }
+.sk-modal-card { background: #ffffff !important; color: #0f172a !important; width: 100%; max-width: 400px; border-radius: 16px; padding: 20px; }
+.sk-btn-text-danger { background: none; border: none; color: #ef4444; font-weight: 700; cursor: pointer; }
