@@ -30,10 +30,60 @@
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
     <script src="js/scanner.js"></script>
 
+   <!-- Interop para Blazor (Escáner Quagga Modal y Captura de Evidencias) -->
+    <script>
+        // Invoca el mismo scanner modal que usa Despensa
+        window.iniciarScannerJS = async function () {
+            if (typeof window.ejecutarEscaneoQuagga === 'function') {
+                return await window.ejecutarEscaneoQuagga();
+            }
+            if (typeof window.abrirEscanerModal === 'function') {
+                return await window.abrirEscanerModal();
+            }
+            return null;
+        };
+
+        // Abre la cámara del dispositivo para la evidencia
+        window.capturarFotoEvidenciaJS = () => {
+            return new Promise((resolve) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                // 'environment' fuerza la cámara trasera en dispositivos móviles
+                input.setAttribute('capture', 'environment'); 
+
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) {
+                        resolve(null);
+                        return;
+                    }
+
+                    // Convierte la foto a Base64 para guardarla directamente en el estado del item
+                    const reader = new FileReader();
+                    reader.onload = (evt) => resolve(evt.target.result);
+                    reader.onerror = () => resolve(null);
+                    reader.readAsDataURL(file);
+                };
+
+                // En caso de que el usuario cancele la selección
+                window.addEventListener('focus', () => {
+                    setTimeout(() => {
+                        if (!input.files || input.files.length === 0) {
+                            resolve(null);
+                        }
+                    }, 500);
+                }, { once: true });
+
+                input.click();
+            });
+        };
+    </script>
+
     <!-- Motor Blazor -->
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- SCRIPT DE LIMPIEZA: Elimina cualquier Service Worker corrupto que esté secuestrando las peticiones -->
+    <!-- SCRIPT DE LIMPIEZA -->
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {

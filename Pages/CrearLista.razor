@@ -1,0 +1,584 @@
+@page "/crear-lista"
+@inject StorageService Storage
+@inject NavigationManager Nav
+
+<div class="sk-list-container">
+
+    <!-- Encabezado -->
+    <header class="sk-list-header">
+        <div class="sk-nav-buttons">
+            <button class="sk-btn-back" @onclick='() => Nav.NavigateTo("/")'>🏠 Inicio</button>
+            <button class="sk-btn-back" @onclick='() => Nav.NavigateTo("/despensa")'>📦 Despensa</button>
+        </div>
+        <div class="sk-header-title">
+            <h2>🛒 Lista del Súper</h2>
+            <p>Planeación de compras y presupuesto</p>
+        </div>
+    </header>
+
+    <!-- Acciones Rápidas -->
+    <div class="sk-list-actions">
+        <button class="sk-btn-accent" @onclick="CargarAgotadosDespensa">
+            ⚡ Cargar Agotados
+        </button>
+        <button class="sk-btn-secondary" @onclick="AbrirModalAgregar">
+            ➕ Agregar Item
+        </button>
+    </div>
+
+    <!-- Contenedor Principal de la Lista -->
+    <div class="sk-list-card">
+        <div class="sk-card-title-row">
+            <h3>Artículos a comprar (@ItemsLista.Count)</h3>
+            @if (ItemsLista.Any())
+            {
+                <button class="sk-btn-text-danger" @onclick="VaciarLista">Vaciar todo</button>
+            }
+        </div>
+
+        @if (!ItemsLista.Any())
+        {
+            <div class="sk-empty-state">
+                <span style="font-size: 2.5rem;">🛒</span>
+                <p>Tu lista está vacía.</p>
+                <small>Presiona "Cargar Agotados" para traer lo que falta en tu despensa.</small>
+            </div>
+        }
+        else
+        {
+            <div class="sk-items-wrapper">
+                @foreach (var item in ItemsLista)
+                {
+                    var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == item.ProductoId);
+                    var nombre = prod?.Nombre ?? item.NombreTemporal ?? "Producto sin nombre";
+                    var marca = prod?.Marca ?? "";
+                    var subtotal = item.CantidadPlaneada * item.PrecioEstimado;
+
+                    <div class="sk-list-item">
+                        <div class="sk-item-details">
+                            <span class="sk-item-title">@nombre</span>
+                            <span class="sk-item-sub">
+                                @(!string.IsNullOrEmpty(marca) ? marca + " • " : "")$@item.PrecioEstimado.ToString("F2") c/u
+                            </span>
+                            <span class="sk-item-subtotal">Subtotal: $@subtotal.ToString("F2")</span>
+                        </div>
+
+                        <div class="sk-item-controls">
+                            <button class="sk-btn-qty" @onclick="() => AjustarCantidad(item, -1)">-</button>
+                            <span class="sk-qty-count">@item.CantidadPlaneada</span>
+                            <button class="sk-btn-qty" @onclick="() => AjustarCantidad(item, 1)">+</button>
+                            
+                            <button class="sk-btn-delete" @onclick="() => QuitarDeLista(item)" title="Quitar de lista">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Resumen de Presupuesto -->
+            <div class="sk-summary-box">
+                <div class="sk-summary-row">
+                    <span>Total Estimado:</span>
+                    <strong class="sk-total-price">$@TotalEstimado.ToString("F2")</strong>
+                </div>
+
+                <button class="sk-btn-go-super" @onclick='() => Nav.NavigateTo("/hacer-super")'>
+                    🛒 Ir a Hacer el Súper
+                </button>
+            </div>
+        }
+    </div>
+
+</div>
+
+<!-- Modal Agregar Item / Dar de Alta Producto -->
+@if (MostrarModal)
+{
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card">
+            <h3 style="color:#0284c7; font-size:1.1rem; margin-bottom:12px; font-weight:bold;">
+                Agregar a la Lista
+            </h3>
+
+            <!-- Selector de productos existentes -->
+            <div class="sk-form-group">
+                <label class="sk-label">Seleccionar de Despensa</label>
+                <select @bind="ProductoSeleccionadoId" class="sk-select">
+                    <option value="">-- Registrar Nuevo Producto --</option>
+                    @foreach (var p in ProductosRegistrados)
+                    {
+                        <option value="@p.Id">@p.Nombre @(!string.IsNullOrEmpty(p.Marca) ? $"({p.Marca})" : "")</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Formulario para Producto Nuevo -->
+            @if (string.IsNullOrEmpty(ProductoSeleccionadoId))
+            {
+                <div class="sk-form-group">
+                    <label class="sk-label">Nombre del Producto *</label>
+                    <input type="text" @bind="NuevoNombreTemp" class="sk-input" placeholder="Ej. Avena Integral 500g" />
+                </div>
+
+                <div class="sk-form-group">
+                    <label class="sk-label">Marca</label>
+                    <input type="text" @bind="NuevaMarcaTemp" class="sk-input" placeholder="Ej. GranVita" />
+                </div>
+
+                <div class="sk-form-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label class="sk-label" style="margin:0;">Categoría</label>
+                        <button class="sk-btn-link" @onclick="ToggleCrearCategoria">
+                            @(MostrarCrearCategoria ? "✕ Cancelar" : "➕ Nueva Categoría")
+                        </button>
+                    </div>
+
+                    @if (MostrarCrearCategoria)
+                    {
+                        <div class="sk-inline-create">
+                            <input type="text" @bind="NuevaCategoriaNombre" class="sk-input" placeholder="Nombre nueva categoría" />
+                            <button class="sk-btn-primary" @onclick="GuardarNuevaCategoria">Guardar</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <select @bind="CategoriaSeleccionadaId" class="sk-select">
+                            <option value="">-- Sin Categoría --</option>
+                            @foreach (var cat in ListaCategorias)
+                            {
+                                <option value="@cat.Id">@cat.Nombre</option>
+                            }
+                        </select>
+                    }
+                </div>
+            }
+
+            <div class="sk-grid-2 sk-form-group">
+                <div>
+                    <label class="sk-label">Precio Est. ($)</label>
+                    <input type="number" step="0.5" @bind="NuevoPrecioEst" class="sk-input" placeholder="0.00 (Opcional)" />
+                </div>
+                <div>
+                    <label class="sk-label">Cantidad</label>
+                    <input type="number" @bind="NuevaCantidad" class="sk-input" min="1" />
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button @onclick="CerrarModal" class="sk-btn-secondary">Cancelar</button>
+                <button @onclick="AgregarItemALaLista" class="sk-btn-primary">Agregar a Lista</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .sk-list-container {
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 20px 16px;
+        background-color: #fcfbf7;
+        min-height: 100vh;
+        color: #1e293b;
+        font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .sk-list-header {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .sk-nav-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .sk-btn-back {
+        background: white;
+        border: 1px solid #cbd5e1;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        color: #475569;
+        font-size: 0.85rem;
+    }
+
+    .sk-header-title h2 {
+        margin: 0;
+        font-size: 1.4rem;
+        color: #0284c7;
+        font-weight: 800;
+    }
+
+    .sk-header-title p {
+        margin: 2px 0 0 0;
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    .sk-list-actions {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .sk-btn-accent {
+        flex: 1;
+        background: #0284c7;
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .sk-btn-secondary {
+        flex: 1;
+        background: white;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        padding: 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .sk-list-card {
+        background: white;
+        border-radius: 16px;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .sk-card-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+    }
+
+    .sk-card-title-row h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        color: #1e293b;
+        font-weight: 700;
+    }
+
+    .sk-empty-state {
+        text-align: center;
+        padding: 30px 10px;
+        color: #64748b;
+    }
+
+    .sk-items-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .sk-list-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .sk-item-details {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .sk-item-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #0f172a;
+    }
+
+    .sk-item-sub {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .sk-item-subtotal {
+        font-size: 0.75rem;
+        color: #0284c7;
+        font-weight: 600;
+    }
+
+    .sk-item-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sk-btn-qty {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1.5px solid #0f172a;
+        background: #ffffff;
+        color: #0f172a;
+        font-weight: 900;
+        font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .sk-qty-count {
+        font-weight: 800;
+        font-size: 0.9rem;
+        min-width: 18px;
+        text-align: center;
+        color: #0f172a;
+    }
+
+    .sk-btn-delete {
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+
+    .sk-summary-box {
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 12px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .sk-summary-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+        color: #0369a1;
+    }
+
+    .sk-total-price {
+        font-size: 1.2rem;
+        color: #0c4a6e;
+    }
+
+    .sk-btn-go-super {
+        background: #0284c7;
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        text-align: center;
+        box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+    }
+
+    /* Modal Styling */
+    .sk-modal-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 1000;
+    }
+
+    .sk-modal-card {
+        background: white;
+        width: 100%;
+        max-width: 400px;
+        border-radius: 16px;
+        padding: 20px;
+    }
+
+    .sk-form-group { margin-bottom: 12px; }
+    .sk-label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .sk-input, .sk-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        box-sizing: border-box;
+    }
+    .sk-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sk-btn-text-danger { background: none; border: none; color: #ef4444; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
+    .sk-btn-primary { background: #0284c7; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .sk-btn-link { background: none; border: none; color: #0284c7; font-size: 0.78rem; font-weight: bold; cursor: pointer; padding: 0; }
+    .sk-inline-create { display: flex; gap: 6px; }
+
+    @@media (min-width: 600px) {
+        .sk-list-container { max-width: 720px; }
+        .sk-list-header { flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+</style>
+
+@code {
+    private List<ItemLista> ItemsLista = new();
+    private List<Producto> ProductosRegistrados = new();
+    private List<Categoria> ListaCategorias = new();
+
+    private bool MostrarModal = false;
+    private bool MostrarCrearCategoria = false;
+
+    private string ProductoSeleccionadoId = string.Empty;
+    private string NuevoNombreTemp = string.Empty;
+    private string NuevaMarcaTemp = string.Empty;
+    private string CategoriaSeleccionadaId = string.Empty;
+    private string NuevaCategoriaNombre = string.Empty;
+
+    private decimal NuevoPrecioEst = 0m;
+    private int NuevaCantidad = 1;
+
+    private decimal TotalEstimado => ItemsLista.Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProductosRegistrados = await Storage.ObtenerProductosAsync();
+        ItemsLista = await Storage.ObtenerListaActualAsync();
+        ListaCategorias = await Storage.ObtenerCategoriasAsync();
+    }
+
+    private async Task GuardarCambios()
+    {
+        await Storage.GuardarListaActualAsync(ItemsLista);
+    }
+
+    private async Task CargarAgotadosDespensa()
+    {
+        var agotados = ProductosRegistrados.Where(p => p.CantidadEnStock <= 0).ToList();
+        bool huboCambios = false;
+
+        foreach (var prod in agotados)
+        {
+            if (!ItemsLista.Any(i => i.ProductoId == prod.Id))
+            {
+                ItemsLista.Add(new ItemLista
+                {
+                    ProductoId = prod.Id,
+                    CantidadPlaneada = 1,
+                    PrecioEstimado = prod.UltimoPrecio,
+                    Comprado = false
+                });
+                huboCambios = true;
+            }
+        }
+
+        if (huboCambios) await GuardarCambios();
+    }
+
+    private async Task AjustarCantidad(ItemLista item, int cambio)
+    {
+        item.CantidadPlaneada = Math.Max(1, item.CantidadPlaneada + cambio);
+        await GuardarCambios();
+    }
+
+    private async Task QuitarDeLista(ItemLista item)
+    {
+        ItemsLista.Remove(item);
+        await GuardarCambios();
+    }
+
+    private async Task VaciarLista()
+    {
+        ItemsLista.Clear();
+        await GuardarCambios();
+    }
+
+    private void AbrirModalAgregar()
+    {
+        ProductoSeleccionadoId = string.Empty;
+        NuevoNombreTemp = string.Empty;
+        NuevaMarcaTemp = string.Empty;
+        CategoriaSeleccionadaId = string.Empty;
+        NuevaCategoriaNombre = string.Empty;
+        MostrarCrearCategoria = false;
+        NuevoPrecioEst = 0m;
+        NuevaCantidad = 1;
+        MostrarModal = true;
+    }
+
+    private void CerrarModal() => MostrarModal = false;
+
+    private void ToggleCrearCategoria() => MostrarCrearCategoria = !MostrarCrearCategoria;
+
+    private async Task GuardarNuevaCategoria()
+    {
+        if (string.IsNullOrWhiteSpace(NuevaCategoriaNombre)) return;
+
+        var nuevaCat = new Categoria
+        {
+            Nombre = NuevaCategoriaNombre.Trim()
+        };
+
+        await Storage.GuardarCategoriaAsync(nuevaCat);
+        ListaCategorias = await Storage.ObtenerCategoriasAsync();
+        CategoriaSeleccionadaId = nuevaCat.Id;
+        NuevaCategoriaNombre = string.Empty;
+        MostrarCrearCategoria = false;
+    }
+
+    private async Task AgregarItemALaLista()
+    {
+        string? targetProductoId = null;
+
+        // Si es un producto totalmente nuevo, lo registramos en el catálogo de productos
+        if (string.IsNullOrEmpty(ProductoSeleccionadoId))
+        {
+            if (string.IsNullOrWhiteSpace(NuevoNombreTemp)) return;
+
+            var nuevoProducto = new Producto
+            {
+                Nombre = NuevoNombreTemp.Trim(),
+                Marca = NuevaMarcaTemp.Trim(),
+                CategoriaId = CategoriaSeleccionadaId,
+                UltimoPrecio = NuevoPrecioEst,
+                CantidadEnStock = 0,
+                CodigoBarras = string.Empty // Se asociará posteriormente al escanear en "Hacer el Súper"
+            };
+
+            await Storage.GuardarProductoAsync(nuevoProducto);
+            ProductosRegistrados = await Storage.ObtenerProductosAsync();
+            targetProductoId = nuevoProducto.Id;
+        }
+        else
+
+        {
+            targetProductoId = ProductoSeleccionadoId;
+        }
+
+        var prodRef = ProductosRegistrados.FirstOrDefault(p => p.Id == targetProductoId);
+
+        var item = new ItemLista
+        {
+            ProductoId = targetProductoId,
+            CantidadPlaneada = NuevaCantidad,
+            PrecioEstimado = NuevoPrecioEst > 0 ? NuevoPrecioEst : (prodRef?.UltimoPrecio ?? 0m),
+            Comprado = false
+        };
+
+        ItemsLista.Add(item);
+        await GuardarCambios();
+        CerrarModal();
+    }
+}

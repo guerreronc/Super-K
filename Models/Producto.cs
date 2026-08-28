@@ -10,4 +10,6 @@ public class Producto
     public string UnidadMedida { get; set; } = "Pza"; // Pza, Kg, Litro, Paquete
     public string? FotoBase64 { get; set; }
     public DateTime UltimaActualizacion { get; set; } = DateTime.Now;
+    public string Marca { get; set; } = string.Empty;
+    public int CantidadEnStock { get; set; } = 0;
 }

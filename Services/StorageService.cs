@@ -79,4 +79,11 @@ public class StorageService
             new Categoria { Nombre = "Otros", Icono = "📦" }
         };
     }
+    public async Task EliminarProductoAsync(string id)
+    {
+        var productos = await ObtenerProductosAsync();
+        productos.RemoveAll(p => p.Id == id);
+        await _localStorage.SetItemAsync("superk_productos", productos); 
+        // Nota: Asegúrate de usar la misma clave ("superk_productos" o similar) que usas en tu StorageService
+    }
 }

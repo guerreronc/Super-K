@@ -21,13 +21,13 @@ window.superKScanner = {
                     target: element,
                     constraints: {
                         facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        width: { ideal: 1920, min: 1280 },  // Forzar Full HD
+                        height: { ideal: 1080, min: 720 }
                     }
                 },
                 locator: {
-                    patchSize: "medium",
-                    halfSample: true
+                    patchSize: "large", // "large" ayuda a encontrar códigos finos en imágenes de alta resolución
+                    halfSample: false   // Mantiene el fotograma completo sin recortar resolución
                 },
                 numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2,
                 decoder: {

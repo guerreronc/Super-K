@@ -1,0 +1,734 @@
+@page "/hacer-super"
+@inject StorageService Storage
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="sk-super-container">
+
+    <!-- Encabezado -->
+    <header class="sk-super-header">
+        <button class="sk-btn-back" @onclick='() => Nav.NavigateTo("/crear-lista")'>⬅️ Volver a Lista</button>
+        <div>
+            <h2>🛒 Hacer el Súper</h2>
+            <p>Pasillo y caja en tiempo real</p>
+        </div>
+    </header>
+
+    <!-- Resumen de Gasto en Vivo -->
+    <div class="sk-live-total-card">
+        <div class="sk-total-col">
+            <span class="sk-total-label">Estimado</span>
+            <span class="sk-total-val">$@TotalEstimado.ToString("F2")</span>
+        </div>
+        <div class="sk-total-divider"></div>
+        <div class="sk-total-col">
+            <span class="sk-total-label">Llevas Gastado</span>
+            <span class="sk-total-val highlight">$@TotalReal.ToString("F2")</span>
+        </div>
+    </div>
+
+    <!-- Barra de Escáner y Búsqueda -->
+    <div class="sk-scanner-card">
+        <div class="sk-scanner-row">
+            <button type="button" class="sk-btn-scan-js" @onclick="AbrirEscaner">
+                📷 Escáner
+            </button>
+            <input type="text" 
+                @bind="codigoBusqueda" 
+                placeholder="Escanea o escribe código..." 
+                class="sk-input" />
+            <button type="button" class="sk-btn-accent" @onclick="BuscarProducto">
+                Buscar
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de Compras -->
+    <div class="sk-super-card">
+        <h3>Artículos en Carrito (@ItemsLista.Count(i => i.Comprado) / @ItemsLista.Count)</h3>
+
+        @if (!ItemsLista.Any())
+        {
+            <div class="sk-empty-state">
+                <p>No hay artículos en tu lista planeada.</p>
+                <button class="sk-btn-secondary" @onclick='() => Nav.NavigateTo("/crear-lista")'>Armar Lista</button>
+            </div>
+        }
+        else
+        {
+            <div class="sk-items-list">
+                @foreach (var item in ItemsLista)
+                {
+                    var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == item.ProductoId);
+                    var nombre = prod?.Nombre ?? item.NombreTemporal ?? "Sin nombre";
+                    var marca = prod?.Marca ?? "";
+                    var tieneCodigo = prod != null && !string.IsNullOrEmpty(prod.CodigoBarras);
+
+                    <div class="sk-super-item @(item.Comprado ? "checked" : "")">
+                        <input type="checkbox" class="sk-checkbox" checked="@item.Comprado" 
+                               @onchange="(e) => ToggleComprado(item, (bool)e.Value!)" />
+
+                        <!-- Información del producto -->
+                        <div class="sk-item-info">
+                            <span class="sk-item-title">
+                                @nombre
+                                @if (!tieneCodigo)
+                                {
+                                    <span class="sk-tag-warning">Sin Código</span>
+                                }
+                            </span>
+                            <span class="sk-item-sub">@(!string.IsNullOrEmpty(marca) ? marca : "Sin marca")</span>
+                            
+                            <div class="sk-item-actions-row">
+                                @if (item.TieneFotoOferta && !string.IsNullOrEmpty(item.FotoOfertaBase64))
+                                {
+                                    <button type="button" 
+                                            @onclick="() => MostrarFoto(item.FotoOfertaBase64)"
+                                            class="sk-btn-evidencia-active">
+                                        👁️ Ver Foto
+                                    </button>
+                                    <button type="button" 
+                                            @onclick="() => CapturarEvidenciaOferta(item)"
+                                            class="sk-btn-action-small">
+                                        📷 Cambiar
+                                    </button>
+                                    <button type="button" 
+                                            @onclick="() => BorrarFotoItem(item)"
+                                            class="sk-btn-danger-small">
+                                        ✕
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" 
+                                            @onclick="() => CapturarEvidenciaOferta(item)"
+                                            class="sk-btn-evidencia">
+                                        📷 Evidencia
+                                    </button>
+                                }
+
+                                @if (prod != null)
+                                {
+                                    <button class="sk-btn-edit-inline" @onclick="() => AbrirModalEdicionCompleta(item, prod)">
+                                        ✏️ Editar
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- COLUMNA DE CANTIDAD (Ubicada entre Artículo y Precio) -->
+                        <div class="sk-qty-badge-box">
+                            <span class="sk-qty-label">LLEVAS</span>
+                            <span class="sk-qty-val">@item.CantidadPlaneada <small>pza</small></span>
+                        </div>
+
+                        <!-- Precio Real -->
+                        <div class="sk-price-input-box">
+                            <label>Precio ($)</label>
+                            <input type="number" step="0.5" class="sk-input-price" 
+                                   value="@item.PrecioEstimado" 
+                                   @onchange="(e) => ActualizarPrecioReal(item, e.Value?.ToString())" />
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="sk-finish-box">
+                <button class="sk-btn-success" @onclick="FinalizarCompra">
+                    ✅ Finalizar Compra y Surtir Despensa
+                </button>
+            </div>
+        }
+    </div>
+
+</div>
+
+<!-- MODAL 1: CONFIRMACIÓN RÁPIDA -->
+@if (MostrarModalConfirmarPrecio && itemSeleccionado != null)
+{
+    var prodCoincidente = ProductosRegistrados.FirstOrDefault(p => p.Id == itemSeleccionado.ProductoId);
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card">
+            <div class="sk-modal-header-clean">
+                <h3>⚡ Producto en Lista</h3>
+                <span class="sk-code-badge">🏷️ @prodCoincidente?.CodigoBarras</span>
+            </div>
+
+            <div class="sk-modal-product-box">
+                <p class="sk-modal-product-title">@(prodCoincidente?.Nombre ?? itemSeleccionado.NombreTemporal)</p>
+                <p class="sk-modal-product-sub">Planeado originalmente: <strong>@itemSeleccionado.CantidadPlaneada pza(s)</strong></p>
+            </div>
+
+            <div class="sk-modal-form-stack">
+                <div>
+                    <label class="sk-modal-label">Piezas a Llevar:</label>
+                    <input type="number" 
+                           min="1" 
+                           @bind="cantidadAComprar" 
+                           @bind:event="oninput" 
+                           class="sk-modal-input text-center" />
+                </div>
+
+                <div>
+                    <label class="sk-modal-label">Precio Unitario ($):</label>
+                    <input type="number" 
+                           step="0.50" 
+                           @bind="precioTemporal" 
+                           @bind:event="oninput" 
+                           class="sk-modal-input text-center highlight-price" />
+                </div>
+
+                <div class="sk-subtotal-box">
+                    <span class="sk-subtotal-label">Subtotal Calculado:</span>
+                    <span class="sk-subtotal-amount">
+                        $@((cantidadAComprar * precioTemporal).ToString("F2"))
+                    </span>
+                </div>
+            </div>
+
+            <div class="sk-modal-actions">
+                <button type="button" class="sk-btn-outline" @onclick="CerrarModales">Cancelar</button>
+                <button type="button" class="sk-btn-accent" @onclick="ConfirmarAgregarAlCarrito">
+                    🛒 Agregar al Carrito
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL 2: EDICIÓN COMPLETA -->
+@if (MostrarModalEdicionCompleta)
+{
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card">
+            <div class="sk-modal-header-status">
+                <h3>📝 Registrar / Vincular Producto</h3>
+                <span class="sk-code-badge">🏷️ @(string.IsNullOrEmpty(CodigoEscaneado) ? "Manual" : CodigoEscaneado)</span>
+            </div>
+
+            @if (ItemsSinCodigoEnLista.Any())
+            {
+                <div class="sk-form-group sk-link-box">
+                    <label class="sk-label">🔗 Vincular a producto sin código de la lista:</label>
+                    <select value="@ProductoSeleccionadoVincularId" @onchange="OnSeleccionarVincular" class="sk-select">
+                        <option value="">-- Registrar como Nuevo Producto --</option>
+                        @foreach (var itemSinCod in ItemsSinCodigoEnLista)
+                        {
+                            var p = ProductosRegistrados.FirstOrDefault(x => x.Id == itemSinCod.ProductoId);
+                            if (p != null)
+                            {
+                                <option value="@p.Id">@p.Nombre @(!string.IsNullOrEmpty(p.Marca) ? $"({p.Marca})" : "")</option>
+                            }
+                        }
+                    </select>
+                </div>
+            }
+
+            <div class="sk-form-group">
+                <label class="sk-label">Nombre del Producto *</label>
+                <input type="text" @bind="EditNombre" class="sk-input" placeholder="Ej. Avena Integral GranVita" />
+            </div>
+
+            <div class="sk-form-group">
+                <label class="sk-label">Marca</label>
+                <input type="text" @bind="EditMarca" class="sk-input" placeholder="Ej. GranVita" />
+            </div>
+
+            <div class="sk-form-group">
+                <label class="sk-label">Categoría</label>
+                <select @bind="EditCategoriaId" class="sk-select">
+                    <option value="">-- Sin Categoría --</option>
+                    @foreach (var cat in ListaCategorias)
+                    {
+                        <option value="@cat.Id">@cat.Nombre</option>
+                    }
+                </select>
+            </div>
+
+            <div class="sk-grid-2 sk-form-group">
+                <div>
+                    <label class="sk-label">Cantidad (Pzas)</label>
+                    <input type="number" min="1" @bind="EditCantidad" class="sk-input" />
+                </div>
+                <div>
+                    <label class="sk-label">Precio Real ($)</label>
+                    <input type="number" step="0.5" @bind="EditPrecioReal" class="sk-input" placeholder="0.00" />
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+                <button @onclick="CerrarModales" class="sk-btn-secondary">Cancelar</button>
+                <button @onclick="GuardarYAgregarEdicionCompleta" class="sk-btn-primary">
+                    💾 Guardar y Poner en Carrito
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Escáner -->
+@if (MostrarCamara)
+{
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card" style="text-align: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="color:#0284c7; font-size:1.1rem; font-weight:bold; margin:0;">Escanear Código</h3>
+                <button type="button" @onclick="CerrarCamara" class="sk-btn-text-danger">✕ Cancelar</button>
+            </div>
+            
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto; min-height: 250px;"></div>
+            
+            <p style="font-size: 0.8rem; color: #475569; margin-top: 12px;">
+                Centra el código de barras frente a la cámara.
+            </p>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(fotoModalUrl))
+{
+    <div class="sk-modal-overlay" @onclick="CerrarFotoModal">
+        <div class="sk-modal-card" style="max-width:360px; text-align:center;" @onclick:stopPropagation>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h4 style="margin:0; font-size:0.95rem; font-weight:bold; color:#0f172a;">Evidencia de Oferta</h4>
+                <button type="button" @onclick="CerrarFotoModal" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:#64748b;">✕</button>
+            </div>
+            
+            <img src="@fotoModalUrl" style="max-height:60vh; width:100%; object-fit:contain; border-radius:8px; border:1px solid #cbd5e1;" alt="Foto Evidencia" />
+            
+            <button type="button" @onclick="CerrarFotoModal" class="sk-btn-secondary" style="width:100%; margin-top:12px;">
+                Cerrar
+            </button>
+        </div>
+    </div>
+}
+
+<style>
+    /* Forzar visibilidad en inputs y controles */
+    .sk-super-container input[type="text"],
+    .sk-super-container input[type="number"],
+    .sk-super-container select,
+    .sk-modal-card input[type="text"],
+    .sk-modal-card input[type="number"],
+    .sk-modal-card select {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #94a3b8 !important;
+    }
+
+    .sk-super-container { max-width: 520px; margin: 0 auto; padding: 20px 16px; background-color: #f8fafc; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+    .sk-super-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .sk-btn-back { background: white; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 10px; font-weight: 600; cursor: pointer; color: #475569; font-size: 0.85rem; }
+    .sk-super-header h2 { margin: 0; font-size: 1.3rem; color: #0284c7; font-weight: 800; }
+    .sk-super-header p { margin: 0; font-size: 0.78rem; color: #64748b; }
+
+    .sk-live-total-card { background: #0284c7; color: white; border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: space-around; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25); }
+    .sk-total-col { display: flex; flex-direction: column; align-items: center; }
+    .sk-total-label { font-size: 0.75rem; text-transform: uppercase; opacity: 0.9; font-weight: 700; }
+    .sk-total-val { font-size: 1.3rem; font-weight: 800; }
+    .sk-total-val.highlight { color: #fef08a; font-size: 1.5rem; }
+    .sk-total-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.3); }
+
+    .sk-scanner-card { background: white; border-radius: 14px; padding: 14px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
+    .sk-scanner-row { display: flex; gap: 8px; margin-top: 4px; }
+
+    .sk-btn-scan-js { background: #0f172a; color: white; border: none; padding: 0 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    
+    .sk-super-card { background: white; border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0; }
+    .sk-super-card h3 { margin: 0 0 14px 0; font-size: 1rem; color: #1e293b; font-weight: 700; }
+
+    .sk-items-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .sk-super-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .sk-super-item.checked { background: #f0fdf4; border-color: #bbf7d0; }
+    .sk-checkbox { width: 20px; height: 20px; accent-color: #16a34a; cursor: pointer; }
+
+    .sk-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .sk-item-title { font-weight: 700; font-size: 0.88rem; color: #0f172a; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .sk-item-sub { font-size: 0.75rem; color: #64748b; }
+    
+    .sk-item-actions-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .sk-btn-edit-inline { background: none; border: none; color: #0284c7; font-size: 0.72rem; font-weight: 700; cursor: pointer; padding: 0; }
+    .sk-btn-evidencia { background: #fffbe3; border: 1px solid #fde047; color: #b45309; font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    .sk-btn-evidencia-active { background: #dcfce7; border: 1px solid #86efac; color: #15803d; font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+    .sk-btn-action-small { background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; cursor: pointer; }
+    .sk-btn-danger-small { background: none; border: none; color: #ef4444; font-size: 0.75rem; font-weight: bold; cursor: pointer; padding: 0 4px; }
+    .sk-tag-warning { background: #fef3c7; color: #d97706; font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: 700; }
+
+    /* Estilo para la nueva columna de Cantidad */
+    .sk-qty-badge-box { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #e0f2fe; border: 1px solid #bae6fd; padding: 4px 8px; border-radius: 8px; min-width: 58px; text-align: center; }
+    .sk-qty-label { font-size: 0.6rem; color: #0369a1; font-weight: 800; letter-spacing: 0.5px; }
+    .sk-qty-val { font-size: 1rem; color: #0284c7; font-weight: 900; line-height: 1.1; }
+    .sk-qty-val small { font-size: 0.65rem; font-weight: 700; color: #0369a1; }
+
+    .sk-price-input-box { display: flex; flex-direction: column; align-items: flex-end; width: 75px; }
+    .sk-price-input-box label { font-size: 0.65rem; color: #475569; font-weight: 700; }
+    .sk-input-price { width: 100%; text-align: right; padding: 5px; border: 1px solid #94a3b8; border-radius: 6px; font-weight: 800; font-size: 0.9rem; color: #0f172a; }
+
+    .sk-finish-box { margin-top: 16px; }
+    .sk-btn-success { width: 100%; background: #16a34a; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25); }
+
+    /* Modales Limpios y Legibles */
+    .sk-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; backdrop-filter: blur(2px); }
+    .sk-modal-card { background: #ffffff !important; color: #0f172a !important; width: 100%; max-width: 400px; border-radius: 16px; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
+    
+    .sk-modal-header-clean { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .sk-modal-header-clean h3 { margin: 0; font-size: 1.1rem; color: #0369a1; font-weight: 800; }
+    .sk-code-badge { background: #f1f5f9; font-size: 0.75rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; color: #334155; border: 1px solid #cbd5e1; }
+
+    .sk-modal-product-box { background: #f0f9ff; border: 1px solid #bae6fd; padding: 12px; border-radius: 10px; margin-bottom: 14px; }
+    .sk-modal-product-title { font-weight: 800; color: #0369a1; font-size: 1.05rem; margin: 0 0 4px 0; }
+    .sk-modal-product-sub { font-size: 0.8rem; color: #0284c7; margin: 0; }
+
+    .sk-modal-form-stack { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .sk-modal-label { display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 4px; }
+    .sk-modal-input { width: 100%; padding: 10px; border: 2px solid #cbd5e1; border-radius: 8px; font-size: 1.1rem; font-weight: 800; color: #0f172a; box-sizing: border-box; }
+    .sk-modal-input.highlight-price { color: #15803d; border-color: #86efac; }
+
+    .sk-subtotal-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; text-align: center; }
+    .sk-subtotal-label { font-size: 0.75rem; color: #64748b; font-weight: 600; display: block; }
+    .sk-subtotal-amount { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
+
+    .sk-modal-actions { display: flex; gap: 10px; }
+    .sk-modal-actions button { flex: 1; padding: 10px; font-size: 0.9rem; }
+
+    .sk-link-box { background: #fefce8; border: 1px solid #fef08a; padding: 10px; border-radius: 8px; }
+    .sk-form-group { margin-bottom: 12px; }
+    .sk-label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .sk-input, .sk-select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
+    .sk-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sk-btn-primary { background: #0284c7; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .sk-btn-secondary { background: white; border: 1px solid #cbd5e1; color: #334155; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .sk-btn-accent { background: #0284c7; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .sk-btn-outline { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .sk-btn-text-danger { background: none; border: none; color: #ef4444; font-weight: 700; cursor: pointer; }
+    .sk-empty-state { text-align: center; padding: 20px; color: #64748b; }
+
+    @@media (min-width: 600px) { .sk-super-container { max-width: 640px; } }
+</style>
+
+@code {
+    private List<ItemLista> ItemsLista = new();
+    private List<Producto> ProductosRegistrados = new();
+    private List<Categoria> ListaCategorias = new();
+
+    private string CodigoEscaner = string.Empty;
+    private string CodigoEscaneado = string.Empty;
+
+    // Estados de Modales
+    private bool MostrarModalConfirmarPrecio = false;
+    private bool MostrarModalEdicionCompleta = false;
+
+    private ItemLista? itemSeleccionado = null;
+    private string NombreProductoRapido = string.Empty;
+
+    // Variables de Modal Confirmar
+    private int cantidadAComprar = 1;
+    private decimal precioTemporal = 0m;
+
+    // Campos de Formulario Edición
+    private string ProductoSeleccionadoVincularId = string.Empty;
+    private string EditNombre = string.Empty;
+    private string EditMarca = string.Empty;
+    private string EditCategoriaId = string.Empty;
+    private int EditCantidad = 1;
+    private decimal EditPrecioReal = 0m;
+
+    private string? fotoModalUrl;
+    private string codigoBusqueda = string.Empty;
+    private DotNetObjectReference<HacerSuper>? dotNetHelper;
+    private bool MostrarCamara = false;
+
+    private decimal TotalEstimado => ItemsLista.Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
+    private decimal TotalReal => ItemsLista.Where(i => i.Comprado).Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
+    private decimal LlevasGastado => ItemsLista.Where(i => i.Comprado).Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
+
+    private IEnumerable<ItemLista> ItemsSinCodigoEnLista => ItemsLista.Where(i =>
+    {
+        var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == i.ProductoId);
+        return prod == null || string.IsNullOrEmpty(prod.CodigoBarras);
+    });
+
+    protected override async Task OnInitializedAsync()
+    {
+        dotNetHelper = DotNetObjectReference.Create(this);
+        ProductosRegistrados = await Storage.ObtenerProductosAsync();
+        ListaCategorias = await Storage.ObtenerCategoriasAsync();
+        ItemsLista = await Storage.ObtenerListaActualAsync();
+    }
+
+    private void BuscarProducto()
+    {
+        if (!string.IsNullOrWhiteSpace(codigoBusqueda))
+        {
+            ProcesarCodigoBarras(codigoBusqueda.Trim());
+            codigoBusqueda = string.Empty;
+        }
+    }
+
+    private async Task AbrirEscaner()
+    {
+        MostrarCamara = true;
+        StateHasChanged();
+        await Task.Delay(100);
+        await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
+    }
+
+    private async Task CerrarCamara()
+    {
+        MostrarCamara = false;
+        StateHasChanged();
+        try 
+        { 
+            await JS.InvokeVoidAsync("superKScanner.detenerEscaner"); 
+        } 
+        catch { }
+    }
+
+    [JSInvokable]
+    public async Task OnCodigoEscaneado(string codigo)
+    {
+        var codigoLimpio = codigo?.Trim() ?? string.Empty;
+        codigoBusqueda = codigoLimpio;
+        await CerrarCamara();
+
+        if (!string.IsNullOrEmpty(codigoLimpio))
+        {
+            ProcesarCodigoBarras(codigoLimpio);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        dotNetHelper?.Dispose();
+    }
+
+    private void ProcesarCodigoBarras(string codigo)
+    {
+        CodigoEscaneado = codigo;
+        CerrarModales();
+
+        // 1. Buscar si existe en el catálogo registrado
+        var productoExistente = ProductosRegistrados.FirstOrDefault(p => p.CodigoBarras == codigo);
+
+        if (productoExistente != null)
+        {
+            // 2. Buscar si este producto está en la lista de compras
+            itemSeleccionado = ItemsLista.FirstOrDefault(i => i.ProductoId == productoExistente.Id);
+
+            if (itemSeleccionado != null)
+            {
+                // CASO A: Coincide con la lista
+                cantidadAComprar = itemSeleccionado.CantidadPlaneada > 0 ? itemSeleccionado.CantidadPlaneada : 1;
+                precioTemporal = itemSeleccionado.PrecioEstimado > 0 ? itemSeleccionado.PrecioEstimado : productoExistente.UltimoPrecio;
+                MostrarModalConfirmarPrecio = true;
+                return;
+            }
+        }
+
+        // CASO B: No coincide con ningún producto de la lista -> Modal Edición Completa
+        PrepararModalEdicionCompleta(productoExistente);
+    }
+
+    private async Task ConfirmarAgregarAlCarrito()
+    {
+        if (itemSeleccionado != null)
+        {
+            itemSeleccionado.CantidadPlaneada = cantidadAComprar;
+            itemSeleccionado.PrecioEstimado = precioTemporal;
+            itemSeleccionado.Comprado = true;
+
+            await Storage.GuardarListaActualAsync(ItemsLista);
+            CerrarModales();
+        }
+    }
+
+    private void MostrarFoto(string base64) => fotoModalUrl = base64;
+    private void CerrarFotoModal() => fotoModalUrl = null;
+
+    private void BorrarFotoItem(ItemLista item)
+    {
+        item.TieneFotoOferta = false;
+        item.FotoOfertaBase64 = null;
+    }
+
+    private void PrepararModalEdicionCompleta(Producto? productoExistente)
+    {
+        ProductoSeleccionadoVincularId = string.Empty;
+
+        if (productoExistente != null)
+        {
+            EditNombre = productoExistente.Nombre;
+            EditMarca = productoExistente.Marca;
+            EditCategoriaId = productoExistente.CategoriaId;
+            EditPrecioReal = productoExistente.UltimoPrecio;
+        }
+        else
+        {
+            EditNombre = string.Empty;
+            EditMarca = string.Empty;
+            EditCategoriaId = string.Empty;
+            EditPrecioReal = 0m;
+        }
+
+        EditCantidad = 1;
+        MostrarModalEdicionCompleta = true;
+    }
+
+    private void OnSeleccionarVincular(ChangeEventArgs e)
+    {
+        ProductoSeleccionadoVincularId = e.Value?.ToString() ?? string.Empty;
+        var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == ProductoSeleccionadoVincularId);
+
+        if (prod != null)
+        {
+            EditNombre = prod.Nombre;
+            EditMarca = prod.Marca;
+            EditCategoriaId = prod.CategoriaId;
+            if (EditPrecioReal == 0) EditPrecioReal = prod.UltimoPrecio;
+
+            var item = ItemsLista.FirstOrDefault(i => i.ProductoId == prod.Id);
+            if (item != null) EditCantidad = item.CantidadPlaneada;
+        }
+    }
+
+    private void AbrirModalEdicionCompleta(ItemLista item, Producto prod)
+    {
+        CodigoEscaneado = prod.CodigoBarras;
+        ProductoSeleccionadoVincularId = prod.Id;
+
+        EditNombre = prod.Nombre;
+        EditMarca = prod.Marca;
+        EditCategoriaId = prod.CategoriaId;
+        EditCantidad = item.CantidadPlaneada;
+        EditPrecioReal = item.PrecioEstimado;
+
+        MostrarModalEdicionCompleta = true;
+    }
+
+    private async Task GuardarYAgregarEdicionCompleta()
+    {
+        if (string.IsNullOrWhiteSpace(EditNombre)) return;
+
+        Producto? prodTarget = null;
+
+        if (!string.IsNullOrEmpty(ProductoSeleccionadoVincularId))
+        {
+            prodTarget = ProductosRegistrados.FirstOrDefault(p => p.Id == ProductoSeleccionadoVincularId);
+        }
+
+        if (prodTarget == null)
+        {
+            prodTarget = new Producto
+            {
+                Nombre = EditNombre.Trim(),
+                Marca = EditMarca.Trim(),
+                CategoriaId = EditCategoriaId,
+                CodigoBarras = CodigoEscaneado,
+                UltimoPrecio = EditPrecioReal
+            };
+            await Storage.GuardarProductoAsync(prodTarget);
+        }
+        else
+        {
+            prodTarget.Nombre = EditNombre.Trim();
+            prodTarget.Marca = EditMarca.Trim();
+            prodTarget.CategoriaId = EditCategoriaId;
+            if (!string.IsNullOrEmpty(CodigoEscaneado)) prodTarget.CodigoBarras = CodigoEscaneado;
+            if (EditPrecioReal > 0) prodTarget.UltimoPrecio = EditPrecioReal;
+
+            await Storage.GuardarProductoAsync(prodTarget);
+        }
+
+        ProductosRegistrados = await Storage.ObtenerProductosAsync();
+
+        var itemLista = ItemsLista.FirstOrDefault(i => i.ProductoId == prodTarget.Id);
+        if (itemLista != null)
+        {
+            itemLista.CantidadPlaneada = EditCantidad;
+            itemLista.PrecioEstimado = EditPrecioReal;
+            itemLista.Comprado = true;
+        }
+        else
+        {
+            ItemsLista.Add(new ItemLista
+            {
+                ProductoId = prodTarget.Id,
+                CantidadPlaneada = EditCantidad,
+                PrecioEstimado = EditPrecioReal,
+                Comprado = true
+            });
+        }
+
+        await Storage.GuardarListaActualAsync(ItemsLista);
+        CerrarModales();
+    }
+
+    private async Task CapturarEvidenciaOferta(ItemLista item)
+    {
+        var fotoBase64 = await JS.InvokeAsync<string>("capturarFotoEvidenciaJS");
+        if (!string.IsNullOrEmpty(fotoBase64))
+        {
+            item.TieneFotoOferta = true;
+            item.FotoOfertaBase64 = fotoBase64;
+            await Storage.GuardarListaActualAsync(ItemsLista);
+        }
+    }
+
+    private void LimpiarFotosTemporales()
+    {
+        foreach (var item in ItemsLista)
+        {
+            item.TieneFotoOferta = false;
+            item.FotoOfertaBase64 = null;
+        }
+    }
+
+    private async Task ToggleComprado(ItemLista item, bool comprado)
+    {
+        item.Comprado = comprado;
+        await Storage.GuardarListaActualAsync(ItemsLista);
+    }
+
+    private async Task ActualizarPrecioReal(ItemLista item, string? valorTexto)
+    {
+        if (decimal.TryParse(valorTexto, out decimal nuevoPrecio))
+        {
+            item.PrecioEstimado = Math.Max(0, nuevoPrecio);
+            await Storage.GuardarListaActualAsync(ItemsLista);
+        }
+    }
+
+    private void CerrarModales()
+    {
+        MostrarModalConfirmarPrecio = false;
+        MostrarModalEdicionCompleta = false;
+        itemSeleccionado = null;
+    }
+
+    private async Task FinalizarCompra()
+    {
+        var comprados = ItemsLista.Where(i => i.Comprado).ToList();
+        if (!comprados.Any()) return;
+
+        foreach (var item in comprados)
+        {
+            if (string.IsNullOrEmpty(item.ProductoId)) continue;
+
+            var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == item.ProductoId);
+            if (prod != null)
+            {
+                prod.CantidadEnStock += item.CantidadPlaneada;
+                if (item.PrecioEstimado > 0) prod.UltimoPrecio = item.PrecioEstimado;
+                await Storage.GuardarProductoAsync(prod);
+            }
+        }
+
+        ItemsLista = ItemsLista.Where(i => !i.Comprado).ToList();
+        LimpiarFotosTemporales();
+        await Storage.GuardarListaActualAsync(ItemsLista);
+        Nav.NavigateTo("/despensa");
+    }
+}

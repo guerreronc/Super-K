@@ -37,12 +37,28 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/CrearLista.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ3JlYXJMaXN0YS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/Despensa.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRGVzcGVuc2EucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/HacerSuper.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSGFjZXJTdXBlci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/Home.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSG9tZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/NotFound.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTm90Rm91bmQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/Precios.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJlY2lvcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/CarlosGuerrero/Desktop/App Movil/App SUPER-K/Pages/Weather.razor]
