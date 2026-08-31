@@ -2,6 +2,9 @@
 @inject StorageService Storage
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject HttpClient Http
+@using System.Text.Json
+@using System.IO
 @implements IDisposable
 
 <div class="sk-pantry-container">
@@ -11,85 +14,201 @@
         <button class="sk-btn-back" @onclick='() => Nav.NavigateTo("/")'>← Inicio</button>
         <div class="sk-header-title">
             <h2>🥫 Mi Despensa</h2>
-            <p>Inventario de casa y control de consumos</p>
+            <p>Inventario y control de consumos</p>
         </div>
     </header>
-
-    <!-- Acciones Rápidas -->
-    <div class="sk-pantry-actions">
-        <button class="sk-btn-primary" @onclick="AbrirEscaner">
-            <span>📷</span> Escanear Producto
+    <!-- Barra de Entrada y Búsqueda / Escáner (Estilo Hacer el Súper) -->
+    <div class="sk-scan-bar-container">
+        <button type="button" class="sk-btn-scan-dark" @onclick="() => AbrirEscaner(esConsumo: false)">
+            📷 Escáner
         </button>
-        <button class="sk-btn-secondary" @onclick="AbrirModalNuevo">
-            <span>➕</span> Registro Manual
+        
+        <input type="text" 
+            @bind="codigoEntradaManual" 
+            @bind:event="oninput"
+            @onkeyup="ManejarTeclaEnter"
+            placeholder="Escanea o escribe código..." 
+            class="sk-input-scan" />
+
+        <button type="button" class="sk-btn-search-blue" @onclick="BuscarOAgregarCodigoDirecto" disabled="@cargandoApi">
+            @(cargandoApi ? "⏳" : "Buscar")
         </button>
     </div>
 
-    <!-- Lista de Inventario -->
+    <style>
+        .sk-scan-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #ffffff;
+            padding: 8px 10px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+
+        .sk-btn-scan-dark {
+            background: #0f172a;
+            color: #ffffff;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sk-input-scan {
+            flex: 1;
+            padding: 9px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            outline: none;
+            color: #0f172a;
+        }
+
+        .sk-input-scan:focus {
+            border-color: #0284c7;
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+        }
+
+        .sk-btn-search-blue {
+            background: #0284c7;
+            color: #ffffff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .sk-btn-search-blue:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+    </style>
+    <!-- Acciones Rápidas (Fila 1: Stock y Registro) -->
+    <div class="sk-pantry-actions">
+        <button class="sk-btn-primary" @onclick="() => AbrirEscaner(esConsumo: false)">
+            <span>📷</span> Sumar Stock
+        </button>
+        <button class="sk-btn-danger" @onclick="() => AbrirEscaner(esConsumo: true)">
+            <span>⚡</span> Descontar x Escáner
+        </button>
+        <button class="sk-btn-secondary" @onclick="AbrirModalNuevo">
+            <span>➕</span> Manual
+        </button>
+    </div>
+
+    <!-- Input Oculto para Cargar Archivo -->
+    <InputFile id="fileImportDespensa" OnChange="ImportarDespensa" accept=".json" style="display:none;" />
+
+    <!-- Botones de Respaldo (Fila 2: Archivos) -->
+    <div class="sk-backup-actions">
+        <button class="sk-btn-secondary" style="flex: 1;" @onclick="ExportarDespensa">
+            📥 Respaldar / Compartir
+        </button>
+        <label for="fileImportDespensa" class="sk-btn-secondary" style="flex: 1; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            📤 Restaurar / Cargar
+        </label>
+    </div>
+
+    <!-- Buscador de productos -->
+    <div class="sk-search-bar">
+        <input type="text" 
+               @bind="filtroBusqueda" 
+               @bind:event="oninput" 
+               placeholder="🔍 Buscar en la alacena..." 
+               class="sk-input" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensajeNotificacion))
+    {
+        <div class="sk-toast-alert">@mensajeNotificacion</div>
+    }
+
+    <!-- Lista de Inventario Agrupada por Categoría -->
     <div class="sk-pantry-card">
         <div class="sk-card-title-row">
             <h3>Productos en Casa (@ProductosDespensa.Count)</h3>
         </div>
 
-        @if (!ProductosDespensa.Any())
+        @if (!ProductosAgrupados.Any())
         {
             <div class="sk-empty-state">
                 <span style="font-size: 2.5rem;">🥫</span>
-                <p>Tu despensa está vacía.</p>
+                <p>No se encontraron productos.</p>
                 <small>Escanea empaques o agrega manualmente para empezar el control.</small>
             </div>
         }
         else
         {
-            <div class="sk-pantry-list">
-                @foreach (var prod in ProductosDespensa)
-                {
-                    <div class="sk-pantry-item @(prod.CantidadEnStock <= 0 ? "agotado" : "")">
-                        <div class="sk-item-info">
-                            <span class="sk-item-name">@prod.Nombre</span>
-                            <span class="sk-item-meta">
-                                @(!string.IsNullOrEmpty(prod.Marca) ? prod.Marca + " • " : "")
-                                Precio: $@prod.UltimoPrecio.ToString("F2")
-                            </span>
-
-                            <!-- Punto de Control: Código de Barras e indicador de dígitos -->
-                            @if (!string.IsNullOrWhiteSpace(prod.CodigoBarras))
-                            {
-                                <span class="sk-item-code">
-                                    🏷️ @prod.CodigoBarras 
-                                    <small class="sk-digit-badge">(@prod.CodigoBarras.Length dgt)</small>
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="sk-item-code-none">Sin código asignado</span>
-                            }
-
-                            @if (prod.CantidadEnStock <= 0)
-                            {
-                                <span class="sk-badge-agotado">⚠️ Agotado</span>
-                            }
-                        </div>
-
-                        <div class="sk-item-controls">
-                            <button class="sk-btn-qty" @onclick="() => AjustarStock(prod, -1)">-</button>
-                            <span class="sk-qty-count">@prod.CantidadEnStock</span>
-                            <button class="sk-btn-qty" @onclick="() => AjustarStock(prod, 1)">+</button>
-
-                            @if (prod.CantidadEnStock <= 0)
-                            {
-                                <button class="sk-btn-add-list" @onclick="() => SugerirAgregarALaLista(prod)" title="Agregar a la lista del súper">
-                                    🛒
-                                </button>
-                            }
-
-                            <button class="sk-btn-delete" @onclick="() => EliminarProducto(prod)" title="Eliminar producto">
-                                🗑️
-                            </button>
-                        </div>
+            @foreach (var grupo in ProductosAgrupados)
+            {
+                <div class="sk-category-group">
+                    <div class="sk-category-header">
+                        <h4>@grupo.Key</h4>
+                        <span>@grupo.Count() item(s)</span>
                     </div>
-                }
-            </div>
+
+                    <div class="sk-pantry-list">
+                        @foreach (var prod in grupo)
+                        {
+                            <div class="sk-pantry-item @(prod.CantidadEnStock <= 0 ? "agotado" : (prod.CantidadEnStock == 1 ? "poco-stock" : ""))">
+                                <div class="sk-item-info">
+                                    <span class="sk-item-name">@prod.Nombre</span>
+                                    <span class="sk-item-meta">
+                                        @(!string.IsNullOrEmpty(prod.Marca) ? prod.Marca + " • " : "")
+                                        Precio: $@prod.UltimoPrecio.ToString("F2")
+                                    </span>
+
+                                    @if (!string.IsNullOrWhiteSpace(prod.CodigoBarras))
+                                    {
+                                        <span class="sk-item-code">
+                                            🏷️ @prod.CodigoBarras 
+                                            <small class="sk-digit-badge">(@prod.CodigoBarras.Length dgt)</small>
+                                        </span>
+                                    }
+
+                                    @if (prod.CantidadEnStock <= 0)
+                                    {
+                                        <span class="sk-badge-agotado">⚠️ Agotado</span>
+                                    }
+                                    else if (prod.CantidadEnStock == 1)
+                                    {
+                                        <span class="sk-badge-alerta">⚡ Última pieza</span>
+                                    }
+                                </div>
+
+                                <div class="sk-item-controls">
+                                    <button class="sk-btn-qty" @onclick="() => AjustarStock(prod, -1)">-</button>
+                                    <span class="sk-qty-count">@prod.CantidadEnStock</span>
+                                    <button class="sk-btn-qty" @onclick="() => AjustarStock(prod, 1)">+</button>
+
+                                    @if (prod.CantidadEnStock <= 0)
+                                    {
+                                        <button class="sk-btn-add-list" @onclick="() => SugerirAgregarALaLista(prod)" title="Agregar a la lista del súper">
+                                            🛒
+                                        </button>
+                                    }
+
+                                    <button class="sk-btn-delete" @onclick="() => EliminarProducto(prod)" title="Eliminar producto">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         }
     </div>
 
@@ -101,38 +220,52 @@
     <div class="sk-modal-overlay">
         <div class="sk-modal-card" style="text-align: center;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 style="color:#0284c7; font-size:1rem; font-weight:bold;">Escanear Código</h3>
+                <h3 style="color:#0284c7; font-size:1rem; font-weight:bold;">
+                    @(ModoConsumoEscaner ? "Descontar Producto (-1)" : "Sumar Stock / Escanear")
+                </h3>
                 <button @onclick="CerrarCamara" class="sk-btn-text-danger">✕ Cancelar</button>
             </div>
             <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto; min-height: 250px;"></div>
             <p style="font-size: 0.75rem; color: #64748b; margin-top: 12px;">
-                Centra el código de barras GS1 (EAN-13 o EAN-8) frente a la cámara.
+                Centra el código de barras frente a la cámara.
             </p>
         </div>
     </div>
 }
 
-<!-- Modal Alta / Confirmación de Producto -->
+<!-- Modal Alta / Edición / Confirmación de Producto -->
 @if (MostrarModal)
 {
     <div class="sk-modal-overlay">
         <div class="sk-modal-card">
             <h3 style="color:#0284c7; font-size:1.1rem; margin-bottom:12px; font-weight:bold;">
-                @(string.IsNullOrEmpty(NuevoCodigo) ? "Agregar a Despensa" : "Validar Código Escaneado")
+                @(string.IsNullOrEmpty(NuevoCodigo) ? "Agregar a Despensa" : "Validar / Registrar Producto")
             </h3>
 
-            @if (!string.IsNullOrEmpty(NuevoCodigo))
-            {
-                <div class="sk-code-badge @(EsCodigoValido(NuevoCodigo) ? "valido" : "alerta")">
-                    <span>Código: <strong>@NuevoCodigo</strong> (@NuevoCodigo.Length dígitos)</span>
-                    @if (!EsCodigoValido(NuevoCodigo))
-                    {
-                        <div style="font-size: 0.72rem; margin-top: 4px; color: #b91c1c;">
-                            ⚠️ El código no parece ser EAN-13, UPC-A (12) ni EAN-8 estándar.
-                        </div>
-                    }
+            <!-- Campo Código de Barras (Manual + Consulta Online) -->
+            <div class="sk-form-group">
+                <label class="sk-label">Código de Barras (Escaneado o Manual)</label>
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" 
+                           @bind="NuevoCodigo" 
+                           class="sk-input" 
+                           placeholder="Ej. 7501000111223" 
+                           style="font-family: monospace; font-weight: bold;" />
+                    <button type="button" 
+                            class="sk-btn-secondary" 
+                            style="padding: 0 12px; flex-shrink: 0;" 
+                            @onclick="() => BuscarEnOpenFacts(NuevoCodigo)"
+                            disabled="@cargandoApi">
+                        @(cargandoApi ? "⏳" : "🔍 Buscar")
+                    </button>
                 </div>
-            }
+                @if (!string.IsNullOrEmpty(NuevoCodigo))
+                {
+                    <div class="sk-code-badge @(EsCodigoValido(NuevoCodigo) ? "valido" : "alerta")" style="margin-top: 6px; margin-bottom: 0;">
+                        <span>Estructura: <strong>@NuevoCodigo.Length dígitos</strong> (@(EsCodigoValido(NuevoCodigo) ? "Válida" : "No estándar"))</span>
+                    </div>
+                }
+            </div>
 
             <div class="sk-form-group">
                 <label class="sk-label">Nombre del Producto</label>
@@ -166,12 +299,9 @@
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
-                @if (!string.IsNullOrEmpty(NuevoCodigo))
-                {
-                    <button @onclick="ReintentarEscaneo" class="sk-btn-text-danger" style="font-size:0.8rem;">
-                        🔄 Re-escanear
-                    </button>
-                }
+                <button @onclick="() => ReintentarEscaneo(false)" class="sk-btn-text-danger" style="font-size:0.8rem;">
+                    📷 Abrir Cámara
+                </button>
                 <div style="display:flex; gap:8px; margin-left:auto;">
                     <button @onclick="CerrarModal" class="sk-btn-secondary">Cancelar</button>
                     <button @onclick="GuardarProductoDespensa" class="sk-btn-primary" style="background:#0284c7;">Guardar</button>
@@ -182,292 +312,86 @@
 }
 
 <style>
-    .sk-pantry-container {
-        max-width: 480px;
-        margin: 0 auto;
-        padding: 20px 16px;
-        background-color: #fcfbf7;
-        min-height: 100vh;
-        color: #1e293b;
-        font-family: system-ui, -apple-system, sans-serif;
-    }
+    .sk-pantry-container { max-width: 520px; margin: 0 auto; padding: 20px 16px; background-color: #fcfbf7; min-height: 100vh; color: #1e293b; font-family: system-ui, -apple-system, sans-serif; }
+    .sk-pantry-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .sk-btn-back { background: white; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 10px; font-weight: 600; cursor: pointer; color: #475569; }
+    .sk-header-title h2 { margin: 0; font-size: 1.4rem; color: #0284c7; font-weight: 800; }
+    .sk-header-title p { margin: 2px 0 0 0; font-size: 0.8rem; color: #64748b; }
 
-    .sk-pantry-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 20px;
-    }
+    .sk-pantry-actions { display: flex; gap: 6px; margin-bottom: 12px; }
+    .sk-btn-primary { flex: 1; background: #0284c7; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .sk-btn-danger { flex: 1; background: #dc2626; color: white; border: none; padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .sk-btn-secondary { background: white; border: 1px solid #cbd5e1; color: #334155; padding: 10px 12px; border-radius: 10px; font-weight: 700; font-size: 0.8rem; cursor: pointer; }
 
-    .sk-btn-back {
-        background: white;
-        border: 1px solid #cbd5e1;
-        padding: 8px 12px;
-        border-radius: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        color: #475569;
-    }
+    .sk-search-bar { margin-bottom: 16px; }
+    .sk-toast-alert { margin-bottom: 12px; background: #dcfce7; border: 1px solid #86efac; color: #15803d; font-size: 0.8rem; padding: 8px 12px; border-radius: 8px; font-weight: 700; text-align: center; }
 
-    .sk-header-title h2 {
-        margin: 0;
-        font-size: 1.4rem;
-        color: #0284c7;
-        font-weight: 800;
-    }
+    .sk-pantry-card { background: white; border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+    .sk-card-title-row h3 { margin: 0 0 14px 0; font-size: 1.05rem; color: #1e293b; font-weight: 700; }
 
-    .sk-header-title p {
-        margin: 2px 0 0 0;
-        font-size: 0.8rem;
-        color: #64748b;
-    }
+    .sk-category-group { margin-bottom: 18px; }
+    .sk-category-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; margin-bottom: 8px; }
+    .sk-category-header h4 { margin: 0; font-size: 0.95rem; color: #0369a1; font-weight: 800; }
+    .sk-category-header span { font-size: 0.72rem; color: #64748b; font-weight: 600; }
 
-    .sk-pantry-actions {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
+    .sk-pantry-list { display: flex; flex-direction: column; gap: 10px; }
+    .sk-pantry-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .sk-pantry-item.agotado { border-left: 4px solid #ef4444; background: #fff5f5; }
+    .sk-pantry-item.poco-stock { border-left: 4px solid #f59e0b; background: #fffbeb; }
 
-    .sk-btn-primary {
-        flex: 1;
-        background: #0284c7;
-        color: white;
-        border: none;
-        padding: 12px;
-        border-radius: 12px;
-        font-weight: 700;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-    }
+    .sk-item-info { display: flex; flex-direction: column; flex: 1; margin-right: 8px; }
+    .sk-item-name { font-weight: 700; font-size: 0.9rem; color: #0f172a; }
+    .sk-item-meta { font-size: 0.75rem; color: #64748b; }
+    .sk-item-code { font-size: 0.72rem; color: #0284c7; font-family: monospace; font-weight: 700; margin-top: 2px; }
+    .sk-digit-badge { font-size: 0.65rem; color: #64748b; font-weight: normal; }
+    .sk-badge-agotado { font-size: 0.68rem; color: #ef4444; font-weight: 700; margin-top: 2px; }
+    .sk-badge-alerta { font-size: 0.68rem; color: #d97706; font-weight: 700; margin-top: 2px; }
 
-    .sk-btn-secondary {
-        flex: 1;
-        background: white;
-        border: 1px solid #cbd5e1;
-        color: #334155;
-        padding: 12px;
-        border-radius: 12px;
-        font-weight: 700;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-    }
+    .sk-item-controls { display: flex; align-items: center; gap: 4px; }
+    .sk-btn-qty { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid #0f172a; background: #ffffff; color: #0f172a; font-weight: 900; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .sk-qty-count { font-weight: 800; font-size: 0.95rem; min-width: 20px; text-align: center; color: #0f172a; }
+    .sk-btn-add-list { background: #f59e0b; border: none; padding: 5px 7px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; }
+    .sk-btn-delete { background: #fee2e2; border: 1px solid #fca5a5; padding: 5px 7px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; }
 
-    .sk-pantry-card {
-        background: white;
-        border-radius: 16px;
-        padding: 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-    }
-
-    .sk-card-title-row h3 {
-        margin: 0 0 14px 0;
-        font-size: 1.05rem;
-        color: #1e293b;
-        font-weight: 700;
-    }
-
-    .sk-empty-state {
-        text-align: center;
-        padding: 30px 10px;
-        color: #64748b;
-    }
-
-    .sk-pantry-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .sk-pantry-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px;
-        background: #f8fafc;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-    }
-
-    .sk-pantry-item.agotado {
-        border-left: 4px solid #ef4444;
-        background: #fff5f5;
-    }
-
-    .sk-item-info {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        margin-right: 8px;
-    }
-
-    .sk-item-name {
-        font-weight: 700;
-        font-size: 0.95rem;
-        color: #0f172a;
-    }
-
-    .sk-item-meta {
-        font-size: 0.78rem;
-        color: #64748b;
-    }
-
-    /* Estilos del código de barras en lista */
-    .sk-item-code {
-        font-size: 0.75rem;
-        color: #0284c7;
-        font-family: monospace;
-        font-weight: 700;
-        margin-top: 3px;
-    }
-
-    .sk-digit-badge {
-        font-size: 0.68rem;
-        color: #64748b;
-        font-weight: normal;
-    }
-
-    .sk-item-code-none {
-        font-size: 0.70rem;
-        color: #94a3b8;
-        font-style: italic;
-        margin-top: 3px;
-    }
-
-    .sk-badge-agotado {
-        font-size: 0.68rem;
-        color: #ef4444;
-        font-weight: 700;
-        margin-top: 2px;
-    }
-
-    .sk-item-controls {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .sk-btn-qty {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        border: 1.5px solid #0f172a;
-        background: #ffffff;
-        color: #0f172a;
-        font-weight: 900;
-        font-size: 1.1rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        line-height: 1;
-    }
-
-    .sk-btn-qty:active {
-        background: #0f172a;
-        color: #ffffff;
-    }
-
-    .sk-qty-count {
-        font-weight: 800;
-        font-size: 1rem;
-        min-width: 20px;
-        text-align: center;
-        color: #0f172a;
-    }
-
-    .sk-btn-add-list {
-        background: #f59e0b;
-        border: none;
-        padding: 6px 8px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.85rem;
-    }
-
-    .sk-btn-delete {
-        background: #fee2e2;
-        border: 1px solid #fca5a5;
-        padding: 6px 8px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.85rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Modal Styling */
-    .sk-modal-overlay {
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        z-index: 1000;
-    }
-
-    .sk-modal-card {
-        background: white;
-        width: 100%;
-        max-width: 400px;
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-    }
-
-    .sk-code-badge {
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        margin-bottom: 12px;
-    }
-
-    .sk-code-badge.valido {
-        background: #e0f2fe;
-        color: #0369a1;
-        border: 1px solid #bae6fd;
-    }
-
-    .sk-code-badge.alerta {
-        background: #fef2f2;
-        color: #991b1b;
-        border: 1px solid #fecaca;
-    }
-
-    .sk-form-group { margin-bottom: 12px; }
-    .sk-label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
-    .sk-input, .sk-select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        box-sizing: border-box;
-    }
+    .sk-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; }
+    .sk-modal-card { background: white; width: 100%; max-width: 400px; border-radius: 16px; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    .sk-code-badge { padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 12px; }
+    .sk-code-badge.valido { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .sk-form-group { margin-bottom: 10px; }
+    .sk-label { display: block; font-size: 0.78rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .sk-input, .sk-select { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; }
     .sk-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .sk-btn-text-danger { background: none; border: none; color: #ef4444; font-weight: bold; cursor: pointer; }
+    .sk-empty-state { text-align: center; padding: 30px 10px; color: #64748b; }
+    /* Fila de respaldo en 2da línea */
+    .sk-backup-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
 
-    @@media (min-width: 600px) {
-        .sk-pantry-container { max-width: 720px; }
+    /* Asegurar fondo blanco e integración clara en todos los inputs */
+    .sk-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        box-sizing: border-box;
+        background-color: #ffffff;
+        color: #0f172a;
     }
 </style>
 
 @code {
     private List<Producto> ProductosDespensa = new();
     private List<Categoria> Categorias = new();
+    private string filtroBusqueda = string.Empty;
+    private string mensajeNotificacion = string.Empty;
 
     private bool MostrarCamara = false;
     private bool MostrarModal = false;
+    private bool ModoConsumoEscaner = false;
 
     private string NuevoCodigo = string.Empty;
     private string NuevoNombre = string.Empty;
@@ -475,9 +399,49 @@
     private string CategoriaSeleccionadaId = string.Empty;
     private decimal NuevoPrecio = 0m;
     private int NuevaCantidad = 1;
-
+    private bool cargandoApi = false;
     private DotNetObjectReference<Despensa>? dotNetHelper;
+    private string codigoEntradaManual = string.Empty;
 
+    // Permite presionar Enter directamente en la barra
+    private async Task ManejarTeclaEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await BuscarOAgregarCodigoDirecto();
+        }
+    }
+
+    // Búsqueda inteligente desde el input principal
+    private async Task BuscarOAgregarCodigoDirecto()
+    {
+        var codigoLimpio = codigoEntradaManual?.Trim();
+        if (string.IsNullOrWhiteSpace(codigoLimpio)) return;
+
+        // 1. Revisar si el producto ya existe en la despensa
+        var prod = ProductosDespensa.FirstOrDefault(p => p.CodigoBarras == codigoLimpio);
+
+        if (prod != null)
+        {
+            // Si ya está registrado, sumamos 1 al stock directamente
+            await AjustarStock(prod, 1);
+            MostrarNotificacion($"✓ Stock agregado: {prod.Nombre} (+1)");
+            codigoEntradaManual = string.Empty;
+        }
+        else
+        {
+            // 2. Si no existe, preparamos el modal y consultamos Open Food / Beauty / Products Facts
+            NuevoCodigo = codigoLimpio;
+            NuevoNombre = string.Empty;
+            NuevaMarca = string.Empty;
+            NuevoPrecio = 0m;
+            NuevaCantidad = 1;
+            codigoEntradaManual = string.Empty;
+            
+            MostrarModal = true;
+            await BuscarEnOpenFacts(codigoLimpio);
+        }
+    }
     protected override async Task OnInitializedAsync()
     {
         Categorias = await Storage.ObtenerCategoriasAsync();
@@ -490,11 +454,25 @@
         }
     }
 
+    // Agrupación automática por Categoría + Filtro de búsqueda
+    private IEnumerable<IGrouping<string, Producto>> ProductosAgrupados =>
+        ProductosDespensa
+            .Where(p => string.IsNullOrWhiteSpace(filtroBusqueda) ||
+                        p.Nombre.Contains(filtroBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                        (!string.IsNullOrEmpty(p.Marca) && p.Marca.Contains(filtroBusqueda, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(p => p.Nombre)
+            .GroupBy(p =>
+            {
+                var cat = Categorias.FirstOrDefault(c => c.Id == p.CategoriaId);
+                return cat != null ? $"{cat.Icono} {cat.Nombre}" : "📦 Otros / Sin Categoría";
+            })
+            .OrderBy(g => g.Key);
+
     private bool EsCodigoValido(string codigo)
     {
         if (string.IsNullOrWhiteSpace(codigo)) return false;
         var len = codigo.Trim().Length;
-        return len == 13 || len == 12 || len == 8; // EAN-13, UPC-A (12) y EAN-8
+        return len == 13 || len == 12 || len == 8;
     }
 
     private async Task AjustarStock(Producto prod, int cambio)
@@ -524,6 +502,71 @@
         }
         Nav.NavigateTo("/crear-lista");
     }
+    // Exporta el listado completo a un archivo .json descargable
+private async Task ExportarDespensa()
+{
+    try
+    {
+        if (!ProductosDespensa.Any())
+        {
+            MostrarNotificacion("⚠️ No hay productos para exportar.");
+            return;
+        }
+
+        var opciones = new JsonSerializerOptions { WriteIndented = true };
+        string jsonText = JsonSerializer.Serialize(ProductosDespensa, opciones);
+        
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(jsonText);
+        string base64 = Convert.ToBase64String(bytes);
+
+        string nombreArchivo = $"despensa_{DateTime.Now:yyyyMMdd_HHmm}.json";
+
+        await JS.InvokeVoidAsync("descargarArchivoJson", nombreArchivo, base64);
+        MostrarNotificacion("✅ Archivo listo para compartir.");
+    }
+    catch
+    {
+        MostrarNotificacion("❌ Error al generar el respaldo.");
+    }
+}
+
+// Lee el archivo .json subido y guarda los productos en el Storage local
+    private async Task ImportarDespensa(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var archivo = e.File;
+            if (archivo == null) return;
+
+            // Límite de tamaño: 5 MB
+            using var stream = archivo.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5);
+            using var reader = new StreamReader(stream);
+            string jsonText = await reader.ReadToEndAsync();
+
+            var productosImportados = JsonSerializer.Deserialize<List<Producto>>(jsonText);
+
+            if (productosImportados != null && productosImportados.Any())
+            {
+                foreach (var prod in productosImportados)
+                {
+                    await Storage.GuardarProductoAsync(prod);
+                }
+
+                // Recargar la lista en pantalla desde el Storage local
+                ProductosDespensa = await Storage.ObtenerProductosAsync();
+                MostrarNotificacion($"✅ {productosImportados.Count} productos cargados.");
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                MostrarNotificacion("⚠️ El archivo no contiene productos válidos.");
+            }
+        }
+        catch
+        {
+            MostrarNotificacion("❌ Error al leer el archivo importado.");
+        }
+    }
 
     private void AbrirModalNuevo()
     {
@@ -537,10 +580,10 @@
 
     private void CerrarModal() => MostrarModal = false;
 
-    private async Task ReintentarEscaneo()
+    private async Task ReintentarEscaneo(bool esConsumo)
     {
         CerrarModal();
-        await AbrirEscaner();
+        await AbrirEscaner(esConsumo);
     }
 
     private async Task GuardarProductoDespensa()
@@ -573,8 +616,9 @@
         CerrarModal();
     }
 
-    private async Task AbrirEscaner()
+    private async Task AbrirEscaner(bool esConsumo)
     {
+        ModoConsumoEscaner = esConsumo;
         MostrarCamara = true;
         await Task.Delay(100);
         await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
@@ -586,30 +630,137 @@
         try { await JS.InvokeVoidAsync("superKScanner.detenerEscaner"); } catch { }
     }
 
+    // Método de consulta en cascada a las 3 APIs de Open Facts
+    private async Task BuscarEnOpenFacts(string codigo)
+    {
+        var codigoLimpio = codigo?.Trim();
+        if (string.IsNullOrWhiteSpace(codigoLimpio))
+        {
+            MostrarNotificacion("⚠️ Ingresa un código de barras primero.");
+            return;
+        }
+
+        cargandoApi = true;
+        StateHasChanged();
+
+        // Dominios a consultar en orden: Alimentos -> Cosméticos/Aseo -> Productos Generales
+        var dominios = new[] { "openfoodfacts.org", "openbeautyfacts.org", "openproductsfacts.org" };
+        bool encontrado = false;
+
+        try
+        {
+            foreach (var dominio in dominios)
+            {
+                var url = $"https://world.{dominio}/api/v0/product/{codigoLimpio}.json";
+                var response = await Http.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("status", out var status) && status.GetInt32() == 1)
+                    {
+                        if (root.TryGetProperty("product", out var product))
+                        {
+                            // 1. Nombre del producto (prioridad idioma español)
+                            if (product.TryGetProperty("product_name_es", out var nameEs) && !string.IsNullOrWhiteSpace(nameEs.GetString()))
+                            {
+                                NuevoNombre = nameEs.GetString()!;
+                            }
+                            else if (product.TryGetProperty("product_name", out var name) && !string.IsNullOrWhiteSpace(name.GetString()))
+                            {
+                                NuevoNombre = name.GetString()!;
+                            }
+
+                            // 2. Marca
+                            if (product.TryGetProperty("brands", out var brand) && !string.IsNullOrWhiteSpace(brand.GetString()))
+                            {
+                                NuevaMarca = brand.GetString()!.Split(',')[0].Trim();
+                            }
+
+                            encontrado = true;
+                            MostrarNotificacion($"✨ Datos encontrados en {dominio.Split('.')[0].ToUpper()}");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!encontrado)
+            {
+                MostrarNotificacion("ℹ️ Producto no encontrado en APIs Open Facts. Completa los datos a mano.");
+            }
+        }
+        catch
+        {
+            MostrarNotificacion("⚠️ Error de conexión al consultar datos online.");
+        }
+        finally
+        {
+            cargandoApi = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // Al escanear con la cámara
     [JSInvokable]
     public async Task OnCodigoEscaneado(string codigo)
     {
-        MostrarCamara = false;
+        await CerrarCamara();
         var codigoLimpio = codigo?.Trim() ?? string.Empty;
-
         var prod = ProductosDespensa.FirstOrDefault(p => p.CodigoBarras == codigoLimpio);
 
-        if (prod != null)
+        if (ModoConsumoEscaner)
         {
-            prod.CantidadEnStock++;
-            await Storage.GuardarProductoAsync(prod);
+            if (prod != null && prod.CantidadEnStock > 0)
+            {
+                await AjustarStock(prod, -1);
+                MostrarNotificacion($"✓ Consumido: {prod.Nombre} (-1)");
+            }
+            else if (prod != null)
+            {
+                MostrarNotificacion($"⚠️ {prod.Nombre} ya está agotado.");
+            }
+            else
+            {
+                MostrarNotificacion($"❌ Código {codigoLimpio} no registrado en despensa.");
+            }
         }
         else
         {
-            NuevoCodigo = codigoLimpio;
-            NuevoNombre = string.Empty;
-            NuevaMarca = string.Empty;
-            NuevoPrecio = 0m;
-            NuevaCantidad = 1;
-            MostrarModal = true;
+            if (prod != null)
+            {
+                await AjustarStock(prod, 1);
+                MostrarNotificacion($"✓ Stock agregado: {prod.Nombre} (+1)");
+            }
+            else
+            {
+                // Producto nuevo: preparamos datos y consultamos APIs online automáticamente
+                NuevoCodigo = codigoLimpio;
+                NuevoNombre = string.Empty;
+                NuevaMarca = string.Empty;
+                NuevoPrecio = 0m;
+                NuevaCantidad = 1;
+                MostrarModal = true;
+                
+                await BuscarEnOpenFacts(codigoLimpio);
+            }
         }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void MostrarNotificacion(string msg)
+    {
+        mensajeNotificacion = msg;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            mensajeNotificacion = string.Empty;
+            await InvokeAsync(StateHasChanged);
+        });
     }
 
     public void Dispose() => dotNetHelper?.Dispose();

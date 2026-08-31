@@ -2,6 +2,8 @@
 @inject StorageService Storage
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject HttpClient Http
+@using System.Text.Json
 @implements IDisposable
 
 <div class="sk-super-container">
@@ -117,7 +119,7 @@
                             </div>
                         </div>
 
-                        <!-- COLUMNA DE CANTIDAD (Ubicada entre Artículo y Precio) -->
+                        <!-- COLUMNA DE CANTIDAD -->
                         <div class="sk-qty-badge-box">
                             <span class="sk-qty-label">LLEVAS</span>
                             <span class="sk-qty-val">@item.CantidadPlaneada <small>pza</small></span>
@@ -144,7 +146,7 @@
 
 </div>
 
-<!-- MODAL 1: CONFIRMACIÓN RÁPIDA -->
+<!-- MODAL 1: CONFIRMACIÓN RÁPIDA (PRODUCTO YA REGISTRADO Y EN LISTA) -->
 @if (MostrarModalConfirmarPrecio && itemSeleccionado != null)
 {
     var prodCoincidente = ProductosRegistrados.FirstOrDefault(p => p.Id == itemSeleccionado.ProductoId);
@@ -197,7 +199,7 @@
     </div>
 }
 
-<!-- MODAL 2: EDICIÓN COMPLETA -->
+<!-- MODAL 2: EDICIÓN / REGISTRO RÁPIDO CON AUTOCOMPLETADO WEB -->
 @if (MostrarModalEdicionCompleta)
 {
     <div class="sk-modal-overlay">
@@ -206,6 +208,13 @@
                 <h3>📝 Registrar / Vincular Producto</h3>
                 <span class="sk-code-badge">🏷️ @(string.IsNullOrEmpty(CodigoEscaneado) ? "Manual" : CodigoEscaneado)</span>
             </div>
+
+            @if (buscandoEnWeb)
+            {
+                <div style="text-align:center; padding: 10px; color:#0284c7; font-weight:bold;">
+                    🔍 Consultando datos del producto en internet...
+                </div>
+            }
 
             @if (ItemsSinCodigoEnLista.Any())
             {
@@ -305,7 +314,6 @@
 }
 
 <style>
-    /* Forzar visibilidad en inputs y controles */
     .sk-super-container input[type="text"],
     .sk-super-container input[type="number"],
     .sk-super-container select,
@@ -355,7 +363,6 @@
     .sk-btn-danger-small { background: none; border: none; color: #ef4444; font-size: 0.75rem; font-weight: bold; cursor: pointer; padding: 0 4px; }
     .sk-tag-warning { background: #fef3c7; color: #d97706; font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: 700; }
 
-    /* Estilo para la nueva columna de Cantidad */
     .sk-qty-badge-box { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #e0f2fe; border: 1px solid #bae6fd; padding: 4px 8px; border-radius: 8px; min-width: 58px; text-align: center; }
     .sk-qty-label { font-size: 0.6rem; color: #0369a1; font-weight: 800; letter-spacing: 0.5px; }
     .sk-qty-val { font-size: 1rem; color: #0284c7; font-weight: 900; line-height: 1.1; }
@@ -368,7 +375,6 @@
     .sk-finish-box { margin-top: 16px; }
     .sk-btn-success { width: 100%; background: #16a34a; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25); }
 
-    /* Modales Limpios y Legibles */
     .sk-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; backdrop-filter: blur(2px); }
     .sk-modal-card { background: #ffffff !important; color: #0f172a !important; width: 100%; max-width: 400px; border-radius: 16px; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
     
@@ -418,6 +424,7 @@
     // Estados de Modales
     private bool MostrarModalConfirmarPrecio = false;
     private bool MostrarModalEdicionCompleta = false;
+    private bool buscandoEnWeb = false;
 
     private ItemLista? itemSeleccionado = null;
     private string NombreProductoRapido = string.Empty;
@@ -441,7 +448,6 @@
 
     private decimal TotalEstimado => ItemsLista.Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
     private decimal TotalReal => ItemsLista.Where(i => i.Comprado).Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
-    private decimal LlevasGastado => ItemsLista.Where(i => i.Comprado).Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
 
     private IEnumerable<ItemLista> ItemsSinCodigoEnLista => ItemsLista.Where(i =>
     {
@@ -457,11 +463,11 @@
         ItemsLista = await Storage.ObtenerListaActualAsync();
     }
 
-    private void BuscarProducto()
+    private async Task BuscarProducto()
     {
         if (!string.IsNullOrWhiteSpace(codigoBusqueda))
         {
-            ProcesarCodigoBarras(codigoBusqueda.Trim());
+            await ProcesarCodigoBarras(codigoBusqueda.Trim());
             codigoBusqueda = string.Empty;
         }
     }
@@ -494,7 +500,7 @@
 
         if (!string.IsNullOrEmpty(codigoLimpio))
         {
-            ProcesarCodigoBarras(codigoLimpio);
+            await ProcesarCodigoBarras(codigoLimpio);
         }
 
         await InvokeAsync(StateHasChanged);
@@ -505,31 +511,98 @@
         dotNetHelper?.Dispose();
     }
 
-    private void ProcesarCodigoBarras(string codigo)
+    private async Task ProcesarCodigoBarras(string codigo)
     {
         CodigoEscaneado = codigo;
         CerrarModales();
 
-        // 1. Buscar si existe en el catálogo registrado
+        // 1. Buscar en catálogo local registrado
         var productoExistente = ProductosRegistrados.FirstOrDefault(p => p.CodigoBarras == codigo);
 
         if (productoExistente != null)
         {
-            // 2. Buscar si este producto está en la lista de compras
             itemSeleccionado = ItemsLista.FirstOrDefault(i => i.ProductoId == productoExistente.Id);
 
             if (itemSeleccionado != null)
             {
-                // CASO A: Coincide con la lista
+                // CASO A: Existe y está en la lista de compras activa
                 cantidadAComprar = itemSeleccionado.CantidadPlaneada > 0 ? itemSeleccionado.CantidadPlaneada : 1;
                 precioTemporal = itemSeleccionado.PrecioEstimado > 0 ? itemSeleccionado.PrecioEstimado : productoExistente.UltimoPrecio;
                 MostrarModalConfirmarPrecio = true;
                 return;
             }
+
+            // Existe en tu BD local pero no en la lista de hoy
+            PrepararModalEdicionCompleta(productoExistente);
+            return;
         }
 
-        // CASO B: No coincide con ningún producto de la lista -> Modal Edición Completa
-        PrepararModalEdicionCompleta(productoExistente);
+        // CASO B: Producto NUEVO (no existe en BD local) -> Consultar Open Food Facts
+        buscandoEnWeb = true;
+        MostrarModalEdicionCompleta = true;
+        StateHasChanged();
+
+        // Cambiar esto:
+        // var (nombreWeb, marcaWeb) = await ConsultarOpenFoodFactsAsync(codigo);
+
+        // Por esto:
+        var (nombreWeb, marcaWeb) = await ConsultarAPIsWebAsync(codigo);
+
+        ProductoSeleccionadoVincularId = string.Empty;
+        EditNombre = !string.IsNullOrEmpty(nombreWeb) ? nombreWeb : "";
+        EditMarca = marcaWeb;
+        EditCategoriaId = string.Empty;
+        EditPrecioReal = 0m;
+        EditCantidad = 1;
+        
+        buscandoEnWeb = false;
+        StateHasChanged();
+    }
+
+    private async Task<(string Nombre, string Marca)> ConsultarAPIsWebAsync(string codigo)
+    {
+        string[] dominios = new[] {
+            "world.openfoodfacts.org",
+            "world.openproductsfacts.org",
+            "world.openbeautyfacts.org"
+        };
+
+        foreach (var dominio in dominios)
+        {
+            try
+            {
+                var response = await Http.GetStringAsync($"https://{dominio}/api/v0/product/{codigo}.json");
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("status", out var st) && st.GetInt32() == 1)
+                {
+                    var prod = root.GetProperty("product");
+
+                    // Nombre (busca español primero, luego general)
+                    string nombre = "";
+                    if (prod.TryGetProperty("product_name_es", out var nEs) && !string.IsNullOrWhiteSpace(nEs.GetString()))
+                        nombre = nEs.GetString()!;
+                    else if (prod.TryGetProperty("product_name", out var n) && !string.IsNullOrWhiteSpace(n.GetString()))
+                        nombre = n.GetString()!;
+
+                    // Marca (busca marcas o propietario de la marca)
+                    string marca = "";
+                    if (prod.TryGetProperty("brands", out var b) && !string.IsNullOrWhiteSpace(b.GetString()))
+                        marca = b.GetString()!;
+                    else if (prod.TryGetProperty("brand_owner", out var bo) && !string.IsNullOrWhiteSpace(bo.GetString()))
+                        marca = bo.GetString()!;
+
+                    if (!string.IsNullOrEmpty(nombre) || !string.IsNullOrEmpty(marca))
+                    {
+                        return (nombre, marca);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        return (string.Empty, string.Empty);
     }
 
     private async Task ConfirmarAgregarAlCarrito()
@@ -705,6 +778,7 @@
     {
         MostrarModalConfirmarPrecio = false;
         MostrarModalEdicionCompleta = false;
+        buscandoEnWeb = false;
         itemSeleccionado = null;
     }
 

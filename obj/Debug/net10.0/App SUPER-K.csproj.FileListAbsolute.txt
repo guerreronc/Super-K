@@ -852,7 +852,6 @@ C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\App SUPE
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\blazor.build.boot-extension.json
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\dotnet.js
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\fjk77d63d2-{0}-99zm1jdh75-99zm1jdh75.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\bxhok9kgdg-{0}-pz81tvbrrq-pz81tvbrrq.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\wudm2tngmy-{0}-kmtjqeqzri-kmtjqeqzri.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\r9g374t1kx-{0}-dbuejqv1qr-dbuejqv1qr.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\x8kwcs8r9o-{0}-bqjiyaj88i-bqjiyaj88i.gz
@@ -904,8 +903,6 @@ C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compress
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\um2n0ntphy-{0}-p5osetst1n-p5osetst1n.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\8i204a1chf-{0}-20mxfi6crt-20mxfi6crt.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ln73vttbzg-{0}-w3qd1tpl0e-w3qd1tpl0e.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\pw4lz1xt88-{0}-hfo996hxpz-hfo996hxpz.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\fvn8u39uhz-{0}-hfo996hxpz-hfo996hxpz.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\equk52gcnu-{0}-286cdd0mnj-286cdd0mnj.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\jzz8kykjat-{0}-o6y2k6vgc3-o6y2k6vgc3.gz
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\6v1lhwkk9j-{0}-b7y73c8sd4-b7y73c8sd4.gz
@@ -1123,11 +1120,15 @@ C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\App SUPE
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\refint\App SUPER-K.dll
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\App SUPER-K.pdb
 C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\ref\App SUPER-K.dll
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.h794ggv2cy.wasm
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.q9zi2zwt0r.pdb
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.h794ggv2cy.wasm.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.q9zi2zwt0r.pdb.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\p1troux5tl-{0}-1yxhrqwcww-1yxhrqwcww.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ads1mk1xne-{0}-h794ggv2cy-h794ggv2cy.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\na1oyl6cao-{0}-q9zi2zwt0r-q9zi2zwt0r.gz
-C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\om6zv3h7d6-{0}-i78vykmi8i-i78vykmi8i.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\scopedcss\Pages\Precios.razor.rz.scp.css
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\bxhok9kgdg-{0}-ok8aygil7l-ok8aygil7l.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\pw4lz1xt88-{0}-b8gdxj5186-b8gdxj5186.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\fvn8u39uhz-{0}-b8gdxj5186-b8gdxj5186.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.pf0ppl38z3.wasm
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.zkncp7y1oq.pdb
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.pf0ppl38z3.wasm.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\bin\Debug\net10.0\wwwroot\_framework\App SUPER-K.zkncp7y1oq.pdb.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\p1troux5tl-{0}-6uny0jswkp-6uny0jswkp.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\ads1mk1xne-{0}-pf0ppl38z3-pf0ppl38z3.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\na1oyl6cao-{0}-zkncp7y1oq-zkncp7y1oq.gz
+C:\Users\CarlosGuerrero\Desktop\App Movil\App SUPER-K\obj\Debug\net10.0\compressed\om6zv3h7d6-{0}-db28hpy0ns-db28hpy0ns.gz

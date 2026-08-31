@@ -1,168 +1,154 @@
 @page "/precios"
-@using System.Globalization
+@using System.Text.Json
 @inject StorageService Storage
 @inject HttpClient Http
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @implements IDisposable
 
-<ErrorBoundary>
-    <ChildContent>
-        <div class="sk-precios-container">
+<div class="sk-precios-container">
 
-            <header class="sk-precios-header">
-                <button type="button" class="sk-btn-back" @onclick='() => Nav.NavigateTo("/")'>⬅️ Inicio</button>
-                <div>
-                    <h2>🏷️ Consulta de Precios</h2>
-                    <p>Historial local y consulta web</p>
-                </div>
-            </header>
+    <header class="sk-precios-header">
+        <button type="button" class="sk-btn-back" @onclick='() => Nav.NavigateTo("/")'>⬅️ Inicio</button>
+        <div>
+            <h2>🏷️ Consulta de Precios</h2>
+            <p>Historial local y consulta web</p>
+        </div>
+    </header>
 
-            <div class="sk-search-card">
-                <div class="sk-search-row">
-                    <button type="button" class="sk-btn-scan" @onclick="AbrirEscaner">
-                        📷 Escáner
-                    </button>
-                    <input type="text" 
-                           @bind="busquedaQuery" 
-                           @bind:event="oninput" 
-                           @keyup="OnKeyPress"
-                           placeholder="Escanea código o escribe producto..." 
-                           class="sk-input-search" />
-                    <button type="button" class="sk-btn-search" @onclick="EjecutarBusqueda">
-                        🔍
-                    </button>
+    <div class="sk-search-card">
+        <div class="sk-search-row">
+            <button type="button" class="sk-btn-scan" @onclick="AbrirEscaner">
+                📷 Escáner
+            </button>
+            <input type="text" 
+                   @bind="busquedaQuery" 
+                   @bind:event="oninput" 
+                   @keyup="OnKeyPress"
+                   placeholder="Escanea código o escribe producto..." 
+                   class="sk-input-search" />
+            <button type="button" class="sk-btn-search" @onclick="EjecutarBusqueda">
+                🔍
+            </button>
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="sk-loading-box">
+            <span class="sk-spinner"></span>
+            <p>Consultando base local y web...</p>
+        </div>
+    }
+
+    @if (!cargando && resultadoActual == null && !busquedaRealizada)
+    {
+        <div class="sk-placeholder-card">
+            <p class="sk-placeholder-icon">📦</p>
+            <p>Escanea un código de barras o busca por nombre para ver tus precios registrados y comparar datos de la web.</p>
+        </div>
+    }
+    else if (!cargando && resultadoActual == null && busquedaRealizada)
+    {
+        <div class="sk-placeholder-card">
+            <p class="sk-placeholder-icon">⚠️</p>
+            <p>No se encontraron coincidencias para "<strong>@busquedaQueryTermina</strong>".</p>
+        </div>
+    }
+
+    @if (!cargando && resultadoActual != null)
+    {
+        <div class="sk-result-card">
+            <div class="sk-product-header">
+                @if (!string.IsNullOrEmpty(resultadoActual.ImagenUrl))
+                {
+                    <img src="@resultadoActual.ImagenUrl" class="sk-product-img" alt="Foto producto" />
+                }
+                else
+                {
+                    <div class="sk-product-img-placeholder">🛒</div>
+                }
+                <div class="sk-product-meta">
+                    <span class="sk-badge-code">🏷️ @(string.IsNullOrEmpty(resultadoActual.CodigoBarras) ? "Sin Código" : resultadoActual.CodigoBarras)</span>
+                    <h3>@resultadoActual.Nombre</h3>
+                    <span class="sk-brand-tag">@(!string.IsNullOrEmpty(resultadoActual.Marca) ? resultadoActual.Marca : "Marca no registrada")</span>
                 </div>
             </div>
 
-            @if (cargando)
-            {
-                <div class="sk-loading-box">
-                    <span class="sk-spinner"></span>
-                    <p>Consultando base local y web...</p>
-                </div>
-            }
+            <hr class="sk-divider" />
 
-            @if (!cargando && resultadoActual == null && !busquedaRealizada)
-            {
-                <div class="sk-placeholder-card">
-                    <p class="sk-placeholder-icon">📦</p>
-                    <p>Escanea un código de barras o busca por nombre para ver tus precios registrados y comparar datos de la web.</p>
-                </div>
-            }
-            else if (!cargando && resultadoActual == null && busquedaRealizada)
-            {
-                <div class="sk-placeholder-card">
-                    <p class="sk-placeholder-icon">⚠️</p>
-                    <p>No se encontraron coincidencias para "<strong>@busquedaQueryTermina</strong>".</p>
-                </div>
-            }
-
-            @if (!cargando && resultadoActual != null)
-            {
-                <div class="sk-result-card">
-                    <div class="sk-product-header">
-                        @if (!string.IsNullOrEmpty(resultadoActual.ImagenUrl))
-                        {
-                            <img src="@resultadoActual.ImagenUrl" class="sk-product-img" alt="Foto producto" />
-                        }
-                        else
-                        {
-                            <div class="sk-product-img-placeholder">🛒</div>
-                        }
-                        <div class="sk-product-meta">
-                            <span class="sk-badge-code">🏷️ @(string.IsNullOrEmpty(resultadoActual.CodigoBarras) ? "Sin Código" : resultadoActual.CodigoBarras)</span>
-                            <h3>@resultadoActual.Nombre</h3>
-                            <span class="sk-brand-tag">@(!string.IsNullOrEmpty(resultadoActual.Marca) ? resultadoActual.Marca : "Marca no registrada")</span>
+            <div class="sk-compare-grid">
+                <div class="sk-compare-box sk-box-local">
+                    <span class="sk-box-title">📍 Tu Registro Local</span>
+                    @if (resultadoActual.ExisteEnLocal)
+                    {
+                        <div class="sk-price-display">
+                            <span class="sk-currency">$</span>
+                            <span class="sk-price-num">@resultadoActual.PrecioLocal.ToString("0.00")</span>
                         </div>
-                    </div>
-
-                    <hr class="sk-divider" />
-
-                    <div class="sk-compare-grid">
-                        <div class="sk-compare-box sk-box-local">
-                            <span class="sk-box-title">📍 Tu Registro Local</span>
-                            @if (resultadoActual.ExisteEnLocal)
-                            {
-                                <div class="sk-price-display">
-                                    <span class="sk-currency">$</span>
-                                    <span class="sk-price-num">@resultadoActual.PrecioLocal.ToString("0.00", CultureInfo.InvariantCulture)</span>
-                                </div>
-                                <span class="sk-price-sub">Stock actual: @resultadoActual.StockLocal pza(s)</span>
-                            }
-                            else
-                            {
-                                <div class="sk-empty-local">
-                                    <p>No lo has comprado aún</p>
-                                    <span class="sk-tag-new">Nuevo en tu lista</span>
-                                </div>
-                            }
+                        <span class="sk-price-sub">Stock actual: @resultadoActual.StockLocal pza(s)</span>
+                    }
+                    else
+                    {
+                        <div class="sk-empty-local">
+                            <p>No lo has comprado aún</p>
+                            <span class="sk-tag-new">Nuevo en tu lista</span>
                         </div>
-
-                        <div class="sk-compare-box sk-box-web">
-                            <span class="sk-box-title">🌐 Datos de la Web</span>
-                            @if (resultadoActual.EncontradoEnWeb)
-                            {
-                                <div class="sk-web-info">
-                                    <span class="sk-web-status">✅ Encontrado en Open Food Facts</span>
-                                    <p class="sk-web-detail">Categoría: @(string.IsNullOrEmpty(resultadoActual.CategoriaWeb) ? "General" : resultadoActual.CategoriaWeb)</p>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="sk-empty-web">
-                                    <span>Sin coincidencia pública exacta</span>
-                                </div>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="sk-update-box">
-                        <h4>✏️ Actualizar o Fijar Precio Base</h4>
-                        <div class="sk-update-row">
-                            <div class="sk-field">
-                                <label>Nuevo Precio ($):</label>
-                                <input type="number" step="0.5" @bind="nuevoPrecioInput" class="sk-input-price-edit" />
-                            </div>
-                            <button type="button" class="sk-btn-save" @onclick="GuardarPrecioBase">
-                                💾 Guardar Precio
-                            </button>
-                        </div>
-                    </div>
+                    }
                 </div>
-            }
 
-        </div>
-
-        @if (mostrarCamara)
-        {
-            <div class="sk-modal-overlay">
-                <div class="sk-modal-card" style="text-align: center;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <h3 style="color:#0284c7; font-size:1.1rem; font-weight:bold; margin:0;">Escanear Código</h3>
-                        <button type="button" @onclick="CerrarCamara" class="sk-btn-text-danger">✕ Cancelar</button>
-                    </div>
-                    
-                    <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto; min-height: 250px;"></div>
-                    
-                    <p style="font-size: 0.8rem; color: #475569; margin-top: 12px;">
-                        Centra el código de barras frente a la cámara.
-                    </p>
+                <div class="sk-compare-box sk-box-web">
+                    <span class="sk-box-title">🌐 Datos de la Web</span>
+                    @if (resultadoActual.EncontradoEnWeb)
+                    {
+                        <div class="sk-web-info">
+                            <span class="sk-web-status">✅ Encontrado en Open Food Facts</span>
+                            <p class="sk-web-detail">Categoría: @(string.IsNullOrEmpty(resultadoActual.CategoriaWeb) ? "General" : resultadoActual.CategoriaWeb)</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="sk-empty-web">
+                            <span>Sin coincidencia pública exacta</span>
+                        </div>
+                    }
                 </div>
             </div>
-        }
-    </ChildContent>
-    <ErrorContent Context="ex">
-        <div style="padding: 20px; background: #fff; color: #b91c1c; font-family: sans-serif; margin: 20px; border-radius: 12px; border: 2px solid #f87171;">
-            <h3 style="margin-top:0;">⚠️ Error detectado en iPhone:</h3>
-            <p><strong>Mensaje:</strong> @ex.Message</p>
-            <details style="margin-top:10px;">
-                <summary style="cursor:pointer; font-weight:bold;">Ver detalles técnicos</summary>
-                <pre style="font-size: 0.75rem; white-space: pre-wrap; background: #fef2f2; padding: 10px; border-radius: 6px; margin-top: 8px;">@ex.StackTrace</pre>
-            </details>
+
+            <div class="sk-update-box">
+                <h4>✏️ Actualizar o Fijar Precio Base</h4>
+                <div class="sk-update-row">
+                    <div class="sk-field">
+                        <label>Nuevo Precio ($):</label>
+                        <input type="number" step="0.5" @bind="nuevoPrecioInput" class="sk-input-price-edit" />
+                    </div>
+                    <button type="button" class="sk-btn-save" @onclick="GuardarPrecioBase">
+                        💾 Guardar Precio
+                    </button>
+                </div>
+            </div>
         </div>
-    </ErrorContent>
-</ErrorBoundary>
+    }
+
+</div>
+
+@if (mostrarCamara)
+{
+    <div class="sk-modal-overlay">
+        <div class="sk-modal-card" style="text-align: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="color:#38bdf8; font-size:1.1rem; font-weight:bold; margin:0;">Escanear Código</h3>
+                <button type="button" @onclick="CerrarCamara" class="sk-btn-text-danger">✕ Cancelar</button>
+            </div>
+            
+            <div id="reader" style="width: 100%; max-width: 400px; margin: 0 auto; min-height: 250px;"></div>
+            
+            <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 12px;">
+                Centra el código de barras frente a la cámara.
+            </p>
+        </div>
+    </div>
+}
 
 @code {
     private string busquedaQuery = string.Empty;
@@ -174,18 +160,6 @@
 
     private ResultadoConsultaDTO? resultadoActual = null;
     private DotNetObjectReference<Precios>? dotNetHelper;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            try
-            {
-                dotNetHelper = DotNetObjectReference.Create(this);
-            }
-            catch { }
-        }
-    }
 
     private async Task OnKeyPress(KeyboardEventArgs e)
     {
@@ -248,17 +222,30 @@
             {
                 try
                 {
-                    var httpResponse = await Http.GetAsync($"https://world.openfoodfacts.org/api/v0/product/{codigoABuscar}.json");
-                    if (httpResponse.IsSuccessStatusCode)
+                    var responseString = await Http.GetStringAsync($"https://world.openfoodfacts.org/api/v0/product/{codigoABuscar}.json");
+                    using var doc = JsonDocument.Parse(responseString);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("status", out var statusProp) && statusProp.GetInt32() == 1)
                     {
-                        var response = await httpResponse.Content.ReadFromJsonAsync<OpenFoodFactsResponse>();
-                        if (response != null && response.status == 1 && response.product != null)
+                        if (root.TryGetProperty("product", out var productProp))
                         {
                             dto.EncontradoEnWeb = true;
-                            if (string.IsNullOrEmpty(dto.Nombre)) dto.Nombre = response.product.product_name ?? "Producto Desconocido";
-                            if (string.IsNullOrEmpty(dto.Marca)) dto.Marca = response.product.brands ?? "";
-                            dto.ImagenUrl = response.product.image_front_small_url ?? response.product.image_url ?? "";
-                            dto.CategoriaWeb = response.product.categories ?? "";
+
+                            if (string.IsNullOrEmpty(dto.Nombre) && productProp.TryGetProperty("product_name", out var nameProp))
+                                dto.Nombre = nameProp.GetString() ?? "";
+
+                            if (string.IsNullOrEmpty(dto.Marca) && productProp.TryGetProperty("brands", out var brandProp))
+                                dto.Marca = brandProp.GetString() ?? "";
+
+                            if (productProp.TryGetProperty("image_front_small_url", out var imgPropSmall))
+                                dto.ImagenUrl = imgPropSmall.GetString() ?? "";
+                            else if (productProp.TryGetProperty("image_url", out var imgProp))
+                                dto.ImagenUrl = imgProp.GetString() ?? "";
+
+                            if (productProp.TryGetProperty("categories", out var catProp))
+                                dto.CategoriaWeb = catProp.GetString() ?? "";
+
                             dto.CodigoBarras = codigoABuscar;
                         }
                     }
@@ -311,7 +298,7 @@
             {
                 var nuevoProd = new Producto
                 {
-                    Nombre = resultadoActual.Nombre,
+                    Nombre = string.IsNullOrWhiteSpace(resultadoActual.Nombre) ? "Producto Registrado" : resultadoActual.Nombre,
                     Marca = resultadoActual.Marca,
                     CodigoBarras = resultadoActual.CodigoBarras,
                     UltimoPrecio = nuevoPrecioInput,
@@ -323,7 +310,7 @@
 
             resultadoActual.PrecioLocal = nuevoPrecioInput;
             resultadoActual.ExisteEnLocal = true;
-            await JS.InvokeVoidAsync("alert", "¡Precio guardado correctamente en tu catálogo!");
+            await JS.InvokeVoidAsync("alert", "¡Precio guardado correctamente!");
         }
         catch { }
     }
@@ -335,10 +322,7 @@
         await Task.Delay(150);
         try
         {
-            if (dotNetHelper == null)
-            {
-                dotNetHelper = DotNetObjectReference.Create(this);
-            }
+            dotNetHelper ??= DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("superKScanner.iniciarEscaner", dotNetHelper);
         }
         catch { }
@@ -376,20 +360,5 @@
         public bool EncontradoEnWeb { get; set; } = false;
         public string ImagenUrl { get; set; } = string.Empty;
         public string CategoriaWeb { get; set; } = string.Empty;
-    }
-
-    public class OpenFoodFactsResponse
-    {
-        public int status { get; set; }
-        public OFFProduct? product { get; set; }
-    }
-
-    public class OFFProduct
-    {
-        public string? product_name { get; set; }
-        public string? brands { get; set; }
-        public string? image_front_small_url { get; set; }
-        public string? image_url { get; set; }
-        public string? categories { get; set; }
     }
 }

@@ -77,6 +77,14 @@
 
                 input.click();
             });
+            window.descargarArchivoJson = (nombreArchivo, base64Data) => {
+                const link = document.createElement('a');
+                link.download = nombreArchivo;
+                link.href = 'data:application/json;base64,' + base64Data;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
         };
     </script>
 
