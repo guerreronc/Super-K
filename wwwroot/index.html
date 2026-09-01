@@ -9,14 +9,87 @@
     
     <link rel="stylesheet" href="css/app.css" />
     <link href="manifest.webmanifest" rel="manifest" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+
+    <style>
+        .splash-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #020617;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+        }
+
+        .splash-logo {
+            width: 110px;
+            height: 110px;
+            border-radius: 24px;
+            box-shadow: 0 12px 30px -5px rgba(16, 185, 129, 0.3);
+            animation: logoEntrance 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, pulse 2.5s infinite 1.4s ease-in-out;
+        }
+
+        .splash-title {
+            color: #10b981;
+            font-size: 2.4rem;
+            font-weight: 800;
+            margin-top: 20px;
+            margin-bottom: 0;
+            letter-spacing: 4px;
+            opacity: 0;
+            animation: textFadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+        }
+
+        .splash-subtitle {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin-top: 8px;
+            opacity: 0;
+            animation: textFadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.7s forwards;
+        }
+
+        @keyframes logoEntrance {
+            0% {
+                opacity: 0;
+                transform: scale(0.4) translateY(-40px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.06);
+            }
+        }
+
+        @keyframes textFadeUp {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 </head>
 
 <body>
+    <!-- HTML VINCULADO AL CSS ANIMADO -->
     <div id="app">
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#020617; color:#10b981;">
-            <img src="icon.svg" style="width:50px; height:50px; margin-bottom:12px;" alt="SUPER-K" />
-            <h2 style="font-family:sans-serif;">SUPER-K</h2>
+        <div class="splash-container">
+            <img src="icon-192.png" class="splash-logo" alt="SUPER-K" />
+            <h1 class="splash-title">SUPER-K</h1>
+            <p class="splash-subtitle">Cargando tu despensa...</p>
         </div>
     </div>
 
@@ -26,13 +99,11 @@
 
     <!-- Librerías JS -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <!-- CDN de Quagga2 -->
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
     <script src="js/scanner.js"></script>
 
-   <!-- Interop para Blazor (Escáner Quagga Modal y Captura de Evidencias) -->
+    <!-- Interop para Blazor -->
     <script>
-        // Invoca el mismo scanner modal que usa Despensa
         window.iniciarScannerJS = async function () {
             if (typeof window.ejecutarEscaneoQuagga === 'function') {
                 return await window.ejecutarEscaneoQuagga();
@@ -43,13 +114,11 @@
             return null;
         };
 
-        // Abre la cámara del dispositivo para la evidencia
         window.capturarFotoEvidenciaJS = () => {
             return new Promise((resolve) => {
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = 'image/*';
-                // 'environment' fuerza la cámara trasera en dispositivos móviles
                 input.setAttribute('capture', 'environment'); 
 
                 input.onchange = (e) => {
@@ -59,14 +128,12 @@
                         return;
                     }
 
-                    // Convierte la foto a Base64 para guardarla directamente en el estado del item
                     const reader = new FileReader();
                     reader.onload = (evt) => resolve(evt.target.result);
                     reader.onerror = () => resolve(null);
                     reader.readAsDataURL(file);
                 };
 
-                // En caso de que el usuario cancele la selección
                 window.addEventListener('focus', () => {
                     setTimeout(() => {
                         if (!input.files || input.files.length === 0) {
@@ -77,19 +144,33 @@
 
                 input.click();
             });
-            window.descargarArchivoJson = (nombreArchivo, base64Data) => {
-                const link = document.createElement('a');
-                link.download = nombreArchivo;
-                link.href = 'data:application/json;base64,' + base64Data;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
+        };
+
+        window.descargarArchivoJson = (nombreArchivo, base64Data) => {
+            const link = document.createElement('a');
+            link.download = nombreArchivo;
+            link.href = 'data:application/json;base64,' + base64Data;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         };
     </script>
 
-    <!-- Motor Blazor -->
-    <script src="_framework/blazor.webassembly.js"></script>
+    <!-- ARRANQUE CONTROLADO: Retarda la carga 2.2s para mostrar la animación completa -->
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const tiempoMinimoSplash = 2200;
+            const inicio = Date.now();
+            
+            await Blazor.start();
+            
+            const transcurrido = Date.now() - inicio;
+            if (transcurrido < tiempoMinimoSplash) {
+                await new Promise(resolve => setTimeout(resolve, tiempoMinimoSplash - transcurrido));
+            }
+        });
+    </script>
 
     <!-- SCRIPT DE LIMPIEZA -->
     <script>
