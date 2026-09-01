@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "App SUPER-K",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-I9C7vkxWX6AYLwW6pYDkmVpPLm4J6VgSJdMv/5INTSs=",
+    "hash": "sha256-s7W1p68iEP5U1wwcw+0QRQEyOKncwLuoDE9I0FeZOVo=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.vzj2a6aakt.js"
@@ -1242,16 +1242,16 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "App SUPER-K.wasm",
-        "name": "App SUPER-K.uiw5zt4zro.wasm",
-        "hash": "sha256-5sqDnXrPws9fUXiLwaaFAkMXSblRih9j0h2dmM1EBk0=",
+        "name": "App SUPER-K.upvpjh2w6l.wasm",
+        "hash": "sha256-0mPuxTDD36YZHtRh5FhKGbhbmqDY0cSefnqIWCzhvTA=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "App SUPER-K.pdb",
-        "name": "App SUPER-K.i30qgf59ll.pdb",
-        "hash": "sha256-AkHvXT15UNucBUzV1H563K4CR5R12beZogoREEWcTVE=",
+        "name": "App SUPER-K.1ces3pkdhw.pdb",
+        "hash": "sha256-kZ4SSRkjVzAVYyJZXAlbzsdQGUOHbuVf6ov7zOUQT6w=",
         "cache": "force-cache"
       }
     ],

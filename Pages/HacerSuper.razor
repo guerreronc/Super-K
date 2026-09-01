@@ -278,8 +278,9 @@
 
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
                 <button @onclick="CerrarModales" class="sk-btn-secondary">Cancelar</button>
+                <!-- Botón actualizado sin la palabra "Guardar" -->
                 <button @onclick="GuardarYAgregarEdicionCompleta" class="sk-btn-primary">
-                    💾 Guardar y Poner en Carrito
+                    🛒 Agregar al Carrito
                 </button>
             </div>
         </div>
@@ -458,7 +459,7 @@
 
     private decimal TotalEstimado => ItemsLista.Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
     private decimal TotalReal => ItemsLista.Where(i => i.Comprado).Sum(i => i.CantidadPlaneada * i.PrecioEstimado);
-
+    private HashSet<string> productosNuevosEnSesion = new();
     private IEnumerable<ItemLista> ItemsSinCodigoEnLista => ItemsLista.Where(i =>
     {
         var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == i.ProductoId);
@@ -717,6 +718,9 @@
                 UltimoPrecio = EditPrecioReal
             };
             await Storage.GuardarProductoAsync(prodTarget);
+            
+            // Guardamos el ID para saber que se creó en esta compra
+            productosNuevosEnSesion.Add(prodTarget.Id); 
         }
         else
         {
@@ -808,14 +812,27 @@
             var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == item.ProductoId);
             if (prod != null)
             {
-                // SOLO suma a la despensa si NO fue marcado como consumo rápido
                 if (!item.EsConsumoRapido)
                 {
                     prod.CantidadEnStock += item.CantidadPlaneada;
+                    if (item.PrecioEstimado > 0) prod.UltimoPrecio = item.PrecioEstimado;
+                    await Storage.GuardarProductoAsync(prod);
                 }
-
-                if (item.PrecioEstimado > 0) prod.UltimoPrecio = item.PrecioEstimado;
-                await Storage.GuardarProductoAsync(prod);
+                else
+                {
+                    // Si es consumo rápido y se registró apenas en esta compra, 
+                    // lo removemos del catálogo para que no aparezca en la despensa con 0.
+                    if (productosNuevosEnSesion.Contains(prod.Id))
+                    {
+                        await Storage.EliminarProductoAsync(prod.Id);
+                    }
+                    else
+                    {
+                        // Si ya existía antes en tu catálogo, conservamos el registro y solo actualizamos precio
+                        if (item.PrecioEstimado > 0) prod.UltimoPrecio = item.PrecioEstimado;
+                        await Storage.GuardarProductoAsync(prod);
+                    }
+                }
             }
         }
 
