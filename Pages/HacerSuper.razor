@@ -117,6 +117,16 @@
                                     </button>
                                 }
                             </div>
+                            <!-- NUEVO: Opciones de Consumo Rápido -->
+                            <div style="margin-top: 4px;">
+                                <label style="font-size: 0.72rem; color: #64748b; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                    <input type="checkbox" 
+                                        checked="@item.EsConsumoRapido" 
+                                        @onchange="(e) => ToggleConsumoRapido(item, (bool)e.Value!)"
+                                        style="accent-color: #f59e0b; cursor: pointer;" />
+                                    🍿 No guardar en despensa (Consumo rápido)
+                                </label>
+                            </div>
                         </div>
 
                         <!-- COLUMNA DE CANTIDAD -->
@@ -454,7 +464,11 @@
         var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == i.ProductoId);
         return prod == null || string.IsNullOrEmpty(prod.CodigoBarras);
     });
-
+    private async Task ToggleConsumoRapido(ItemLista item, bool esConsumo)
+    {
+        item.EsConsumoRapido = esConsumo;
+        await Storage.GuardarListaActualAsync(ItemsLista);
+    }
     protected override async Task OnInitializedAsync()
     {
         dotNetHelper = DotNetObjectReference.Create(this);
@@ -794,7 +808,12 @@
             var prod = ProductosRegistrados.FirstOrDefault(p => p.Id == item.ProductoId);
             if (prod != null)
             {
-                prod.CantidadEnStock += item.CantidadPlaneada;
+                // SOLO suma a la despensa si NO fue marcado como consumo rápido
+                if (!item.EsConsumoRapido)
+                {
+                    prod.CantidadEnStock += item.CantidadPlaneada;
+                }
+
                 if (item.PrecioEstimado > 0) prod.UltimoPrecio = item.PrecioEstimado;
                 await Storage.GuardarProductoAsync(prod);
             }

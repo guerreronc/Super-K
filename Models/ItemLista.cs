@@ -25,4 +25,5 @@ public class ItemLista
     public decimal SubtotalReal => CantidadEnCarrito * PrecioRealEnCaja;
     // Propiedades para evidencia de ofertas en caja
     public bool TieneFotoOferta { get; set; } = false;
+    public bool EsConsumoRapido { get; set; } = false;
 }
