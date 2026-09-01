@@ -13,85 +13,85 @@
 
     <style>
         .splash-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 99999;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
             background-color: #020617;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .splash-hidden {
+            opacity: 0;
+            visibility: hidden;
         }
 
         .splash-logo {
-            width: 110px;
-            height: 110px;
-            border-radius: 24px;
-            box-shadow: 0 12px 30px -5px rgba(16, 185, 129, 0.3);
-            animation: logoEntrance 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, pulse 2.5s infinite 1.4s ease-in-out;
+            width: 105px;
+            height: 105px;
+            border-radius: 22px;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.35);
+            -webkit-animation: splashPop 0.7s ease-out forwards;
+            animation: splashPop 1.3s ease-out forwards;
         }
 
         .splash-title {
             color: #10b981;
-            font-size: 2.4rem;
+            font-size: 2.2rem;
             font-weight: 800;
-            margin-top: 20px;
+            margin-top: 18px;
             margin-bottom: 0;
-            letter-spacing: 4px;
-            opacity: 0;
-            animation: textFadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+            letter-spacing: 3px;
+            -webkit-animation: splashFade 0.8s ease-out forwards;
+            animation: splashFade 0.8s ease-out forwards;
         }
 
         .splash-subtitle {
             color: #64748b;
             font-size: 0.95rem;
-            margin-top: 8px;
-            opacity: 0;
-            animation: textFadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.7s forwards;
+            margin-top: 6px;
+            -webkit-animation: splashFade 2.0s ease-out forwards;
+            animation: splashFade 2.3s ease-out forwards;
         }
 
-        @keyframes logoEntrance {
-            0% {
-                opacity: 0;
-                transform: scale(0.4) translateY(-40px);
-            }
-            100% {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
+        @-webkit-keyframes splashPop {
+            0% { opacity: 0; -webkit-transform: scale(0.6); }
+            100% { opacity: 1; -webkit-transform: scale(1); }
+        }
+        @keyframes splashPop {
+            0% { opacity: 0; transform: scale(0.6); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.06);
-            }
+        @-webkit-keyframes splashFade {
+            0% { opacity: 0; -webkit-transform: translateY(12px); }
+            100% { opacity: 1; -webkit-transform: translateY(0); }
         }
-
-        @keyframes textFadeUp {
-            0% {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        @keyframes splashFade {
+            0% { opacity: 0; transform: translateY(12px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 
 <body>
-    <!-- HTML VINCULADO AL CSS ANIMADO -->
-    <div id="app">
-        <div class="splash-container">
-            <img src="icon-192.png" class="splash-logo" alt="SUPER-K" />
-            <h1 class="splash-title">SUPER-K</h1>
-            <p class="splash-subtitle">Cargando tu despensa...</p>
-        </div>
+    <!-- 1. Única pantalla de carga -->
+    <div id="splash-screen" class="splash-container">
+        <img src="icon-192.png" class="splash-logo" alt="SUPER-K" />
+        <h1 class="splash-title">SUPER-K</h1>
+        <p class="splash-subtitle">Cargando tu despensa...</p>
     </div>
+
+    <!-- 2. Contenedor de Blazor -->
+    <div id="app"></div>
 
     <div id="blazor-error-ui" style="display:none;">
         Ocurrió un error inesperado.
@@ -156,20 +156,27 @@
         };
     </script>
 
-    <!-- ARRANQUE CONTROLADO: Retarda la carga 2.2s para mostrar la animación completa -->
+    <!-- ARRANQUE PARALELO Y SEGURO DE BLAZOR -->
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
     <script>
-        window.addEventListener('DOMContentLoaded', async () => {
-            const tiempoMinimoSplash = 2200;
-            const inicio = Date.now();
+        (function() {
+            const tiempoMinimo = 2500; // 2.5 segundos exactos
             
-            await Blazor.start();
-            
-            const transcurrido = Date.now() - inicio;
-            if (transcurrido < tiempoMinimoSplash) {
-                await new Promise(resolve => setTimeout(resolve, tiempoMinimoSplash - transcurrido));
-            }
-        });
+            const promesaTiempo = new Promise(resolve => setTimeout(resolve, tiempoMinimo));
+            const promesaBlazor = Blazor.start();
+
+            Promise.all([promesaBlazor, promesaTiempo]).then(() => {
+                const splash = document.getElementById('splash-screen');
+                if (splash) {
+                    splash.classList.add('splash-hidden');
+                    setTimeout(() => splash.remove(), 500);
+                }
+            }).catch(err => {
+                console.error('Error al iniciar Blazor:', err);
+                const splash = document.getElementById('splash-screen');
+                if (splash) splash.remove();
+            });
+        })();
     </script>
 
     <!-- SCRIPT DE LIMPIEZA -->
